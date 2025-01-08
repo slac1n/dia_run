@@ -20,6 +20,10 @@ class Data:
         self.activity_id_list = self.get_activity_ids()
 
     def get_activity_ids(self) -> List[int]:
+        # Check if a Delta table exists
+        if not self.is_delta_table():
+            return []
+
         # Load the Delta table using pl.scan_delta
         lf = pl.scan_delta(str(self.STRAVA_DIR))
 
@@ -31,6 +35,18 @@ class Data:
         return unique_activity_ids
 
     def get_strava_data(self) -> pl.DataFrame | None:
+    def is_delta_table(self) -> bool:
+        """
+        Check if a Delta table exists
+
+        Returns
+        -------
+        bool
+            True if a Delta table exists, False otherwise.
+        """
+        delta_log = self.STRAVA_SUMMARY_DIR / "_delta_log"
+        return delta_log.is_dir()
+
         client = authenticate_strava()
         if not client:
             raise ValueError("Failed to authenticate Strava client")
