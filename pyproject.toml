@@ -15,6 +15,7 @@ dependencies = [
   "polars>=1.19.0",
   "pyOpenSSL==24.0.0",
   "python-dotenv>=1.0.1",
+  "questionary>=2.1.0",
   "Requests==2.31.0",
   "selenium-wire>=5.1.0",
   "setuptools>=75.7.0",
