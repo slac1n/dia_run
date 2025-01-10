@@ -20,6 +20,7 @@ dependencies = [
   "selenium-wire>=5.1.0",
   "setuptools>=75.7.0",
   "stravalib>=2.1",
+  "streamlit>=1.41.1",
 ]
 
 [tool.ruff]
