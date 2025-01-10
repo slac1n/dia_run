@@ -101,6 +101,7 @@ class Data:
                 "max_speed": [da.max_speed],
                 "average_watts": [da.average_watts],
                 "max_watts": [da.max_watts],
+                "kilojoules": [da.kilojoules],
             }
         ).with_columns(
             pl.col("start_date_local").cast(pl.Datetime),
