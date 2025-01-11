@@ -66,6 +66,7 @@ st.write(
         "name",
         "distance_in_km",
         "human_readable_time",
+        "human_readable_pace",
         "average_heartrate",
         "kilojoules",
         "in_going_sg",
