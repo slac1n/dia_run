@@ -8,6 +8,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 STRAVA_SUMMARY_DIR = Path("data") / "strava" / "summary"
+STRAVE_STREAM_DIR = Path("data") / "strava" / "stream"
 CARELINK_DIR = Path("data") / "carelink"
 QUESTIONNAIRE_DIR = Path("data") / "run_questionnaires"
 
@@ -120,10 +121,20 @@ if name_date is not None:
     )
     sel_df_carelink_bolus = sel_df_carelink.filter(pl.col("type") == "INSULIN")
 
+    sel_df_strava_stream = (
+        pl.scan_delta(str(STRAVE_STREAM_DIR))
+        .filter((pl.col("activity_id") == sel_activity_id) & (pl.col("moving") == True))
+        .with_columns(
+            pl.col("pace").rolling_mean(20).alias("pace_smooth"),
+        )
+        .collect()
+    )
+
     # load json file from questionnaire
     with open(QUESTIONNAIRE_DIR / f"{sel_activity_id}.json") as f:
         questionnaire = json.load(f)
 
+    st.subheader("Diabetes Management :syringe:")
     fig = make_subplots(specs=[[{"secondary_y": True}]])
 
     fig.add_trace(
@@ -242,3 +253,55 @@ if name_date is not None:
                 )
         else:
             st.markdown("No fueling during run")
+
+    st.subheader("Run :running:", divider="green")
+
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+    fig.add_trace(
+        go.Scatter(
+            x=sel_df_carelink_cgm.filter(
+                pl.col("datetime") >= sel_start_date_local - pl.duration(minutes=5)
+            )["datetime"],
+            y=sel_df_carelink_cgm.filter(
+                pl.col("datetime") >= sel_start_date_local - pl.duration(minutes=5)
+            )["value"],
+            name="Sensor Glucose",
+            mode="lines",
+        ),
+        secondary_y=False,
+    )
+    # ylim between 70 and 250
+    fig.update_yaxes(
+        range=[70, 250], secondary_y=False, title_text="Sensor Glucose [mg/dl]"
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=sel_df_strava_stream["datetime"],
+            y=sel_df_strava_stream["heartrate"],
+            name="Heart Rate",
+            mode="lines",
+            line={"color": "red"},
+        ),
+        secondary_y=True,
+    )
+    fig.add_hrect(
+        y0=180,
+        y1=220,
+        line_width=0,
+        fillcolor="LightGray",
+        opacity=0.2,
+        layer="below",
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=sel_df_strava_stream["datetime"],
+            y=sel_df_strava_stream["pace_smooth"],
+            name="Pace",
+            mode="lines",
+            line={"color": "green"},
+            visible="legendonly",
+        ),
+        secondary_y=True,
+    )
+    st.plotly_chart(fig, use_container_width=True)
