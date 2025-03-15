@@ -1,19 +1,18 @@
 import json
 from datetime import timedelta
-from pathlib import Path
 
 import plotly.graph_objects as go
 import polars as pl
 import streamlit as st
 from plotly.subplots import make_subplots
 
-STRAVA_SUMMARY_DIR = Path("data") / "strava" / "summary"
-STRAVE_STREAM_DIR = Path("data") / "strava" / "stream"
-CARELINK_DIR = Path("data") / "carelink"
-QUESTIONNAIRE_DIR = Path("data") / "run_questionnaires"
+from dia_run.data_models.paths import DataPaths
+
+data_paths = DataPaths()
+
 
 # Load the Delta table using pl.scan_delta
-df_summary = pl.scan_delta(str(STRAVA_SUMMARY_DIR)).with_columns(
+df_summary = pl.scan_delta(str(data_paths.strava_summary)).with_columns(
     pl.format(
         "{}:{}",
         (pl.col("elapsed_time") // 3600),  # Hours
@@ -22,17 +21,13 @@ df_summary = pl.scan_delta(str(STRAVA_SUMMARY_DIR)).with_columns(
     pl.format(
         "{}:{}",
         (pl.col("average_pace").floor().cast(int)),  # Minutes
-        ((pl.col("average_pace") % 1) * 60)
-        .round(0)
-        .cast(int),  # Fractional minutes to seconds
+        ((pl.col("average_pace") % 1) * 60).round(0).cast(int),  # Fractional minutes to seconds
     ).alias("human_readable_pace"),
     pl.format(
         "{}",
         (pl.col("distance") / 1000).round(1),  # Convert meters to kilometers
     ).alias("distance_in_km"),
-    (pl.col("start_date_local") + pl.duration(seconds=pl.col("elapsed_time"))).alias(
-        "end_date_local"
-    ),
+    (pl.col("start_date_local") + pl.duration(seconds=pl.col("elapsed_time"))).alias("end_date_local"),
     pl.format(
         "{} on {}",
         pl.col("name"),  # and only the date
@@ -41,7 +36,7 @@ df_summary = pl.scan_delta(str(STRAVA_SUMMARY_DIR)).with_columns(
 )
 
 df_carelink = (
-    pl.scan_delta(str(CARELINK_DIR))
+    pl.scan_delta(str(data_paths.carelink))
     .filter(pl.col("type") == "CGM")
     .join(
         df_summary.select("activity_id", "start_date_local", "end_date_local"),
