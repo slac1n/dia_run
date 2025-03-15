@@ -7,6 +7,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 from dia_run.data_models.paths import DataPaths
+from dia_run.data_models.run_types import RunType
 
 data_paths = DataPaths()
 
@@ -33,6 +34,16 @@ df_summary = pl.scan_delta(str(data_paths.strava_summary)).with_columns(
         pl.col("name"),  # and only the date
         pl.col("start_date_local").dt.date(),
     ).alias("name_date"),
+    pl.when(pl.col("name").str.contains(RunType.get_keyword(RunType.EASY)))
+    .then(pl.lit(RunType.EASY))
+    .when(pl.col("name").str.contains(RunType.get_keyword(RunType.INTERVAL)))
+    .then(pl.lit(RunType.INTERVAL))
+    .when(pl.col("name").str.contains(RunType.get_keyword(RunType.TEMPO)))
+    .then(pl.lit(RunType.TEMPO))
+    .when(pl.col("name").str.contains(RunType.get_keyword(RunType.LONG)))
+    .then(pl.lit(RunType.LONG))
+    .otherwise(pl.lit(RunType.OTHER))
+    .alias("run_type"),
 )
 
 df_carelink = (
