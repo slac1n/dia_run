@@ -16,7 +16,7 @@ def run_fetcher() -> None:
     data_fetcher = DataFetcher(data_paths=data_paths)
     data_fetcher.fetch_latest_data_and_save()
 
-    questionnaire = RunFuelQuestionnaire()
+    questionnaire = RunFuelQuestionnaire(data_paths=data_paths)
     questionnaire.ask_me()
 
 
