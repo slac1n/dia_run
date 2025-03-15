@@ -6,8 +6,8 @@ from loguru import logger
 from stravalib.client import Client
 
 from dia_run.carelink_client import CareLinkClient
+from dia_run.data_fetcher.strava_client import get_strava_client, stream_last_activity
 from dia_run.data_models.paths import DataPaths
-from dia_run.strava_client import get_strava_client, stream_last_activity
 
 
 class DataFetcher:

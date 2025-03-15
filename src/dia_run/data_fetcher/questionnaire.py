@@ -16,11 +16,7 @@ class RunFuelQuestionnaire:
     def load_filtered_activities(self):
         """Load activities, filtering out those that already have a JSON file."""
         # Read the delta table
-        df = (
-            pl.scan_delta(self.delta_table_path)
-            .select(["activity_id", "name", "start_date_local"])
-            .collect()
-        )
+        df = pl.scan_delta(self.delta_table_path).select(["activity_id", "name", "start_date_local"]).collect()
 
         # Filter out activities with existing JSON files
         existing_files = {int(f.stem) for f in self.QUESTIONNAIRE_DIR.glob("*.json")}
@@ -33,9 +29,7 @@ class RunFuelQuestionnaire:
         activities = self.load_filtered_activities()
 
         if activities.is_empty():
-            print(
-                "No new activities to process. All activities have associated JSON files."
-            )
+            print("No new activities to process. All activities have associated JSON files.")
             exit()
 
         # Prepare choices for the selection question
@@ -51,9 +45,7 @@ class RunFuelQuestionnaire:
             .to_list()
         )
 
-        selected = questionary.select(
-            "Select the activity for this questionnaire:", choices=choices
-        ).ask()
+        selected = questionary.select("Select the activity for this questionnaire:", choices=choices).ask()
 
         # Map the selection back to the activity_id
         self.activity_id = activities.filter(
@@ -67,23 +59,17 @@ class RunFuelQuestionnaire:
 
     def ask_pre_run_info(self):
         """Ask for pre-run fueling information."""
-        did_fuel = questionary.confirm(
-            "Did you take any carbohydrates before the run?"
-        ).ask()
+        did_fuel = questionary.confirm("Did you take any carbohydrates before the run?").ask()
 
         if not did_fuel:
             self.responses["pre_run"] = []
             return
 
-        carbs = questionary.text(
-            "How many grams of carbohydrates did you take pre-run?"
-        ).ask()
+        carbs = questionary.text("How many grams of carbohydrates did you take pre-run?").ask()
         time_before_start = questionary.text(
             "How many minutes before the start of the run did you take it (use negative for before)?"
         ).ask()
-        bolus_percentage = questionary.text(
-            "What percentage of bolus did you take?"
-        ).ask()
+        bolus_percentage = questionary.text("What percentage of bolus did you take?").ask()
         food_type = questionary.text("What kind of food was it?").ask()
 
         self.responses["pre_run"] = {
@@ -105,9 +91,7 @@ class RunFuelQuestionnaire:
             time_of_bolus = questionary.text(
                 "When did you administer the bolus? (minutes from start, negative for before)"
             ).ask()
-            bolus_units = questionary.text(
-                "How many units of bolus did you administer?"
-            ).ask()
+            bolus_units = questionary.text("How many units of bolus did you administer?").ask()
 
             bolus_entries.append(
                 {
@@ -156,16 +140,12 @@ class RunFuelQuestionnaire:
         """Ask about fueling during the run."""
         fueling = []
         while True:
-            took_fuel = questionary.confirm(
-                "Did you take carbohydrates during the run?"
-            ).ask()
+            took_fuel = questionary.confirm("Did you take carbohydrates during the run?").ask()
 
             if not took_fuel:
                 break
 
-            carb_amount = questionary.text(
-                "How many grams of carbohydrates did you take?"
-            ).ask()
+            carb_amount = questionary.text("How many grams of carbohydrates did you take?").ask()
             time_during_run = questionary.text(
                 "When during the run did you take it? (minutes from start, negative for before)"
             ).ask()
