@@ -29,21 +29,11 @@ class Data:
         lf = pl.scan_delta(str(self.STRAVA_SUMMARY_DIR))
 
         # Get unique values of the 'activity_id' column
-        unique_activity_ids = (
-            lf.select(pl.col("activity_id").unique()).collect()["activity_id"].to_list()
-        )
+        unique_activity_ids = lf.select(pl.col("activity_id").unique()).collect()["activity_id"].to_list()
 
         return unique_activity_ids
 
     def is_delta_table(self) -> bool:
-        """
-        Check if a Delta table exists
-
-        Returns
-        -------
-        bool
-            True if a Delta table exists, False otherwise.
-        """
         delta_log = self.STRAVA_SUMMARY_DIR / "_delta_log"
         return delta_log.is_dir()
 
@@ -65,9 +55,7 @@ class Data:
             raise ValueError("Failed to get latest activity ID")
 
         if self.latest_activity_id in self.activity_id_list:
-            logger.info(
-                f"Activity with id={self.latest_activity_id} already exists in the data"
-            )
+            logger.info(f"Activity with id={self.latest_activity_id} already exists in the data")
             return None, None
 
         # Process Strava data for the latest activity
@@ -81,9 +69,7 @@ class Data:
 
         # Get activity streams for heart rate and power
         stream_types = ["heartrate", "watts", "velocity_smooth", "moving"]
-        streams = client.get_activity_streams(
-            self.latest_activity_id, types=stream_types, series_type="time"
-        )
+        streams = client.get_activity_streams(self.latest_activity_id, types=stream_types, series_type="time")
 
         df_summary = pl.DataFrame(
             {
@@ -110,9 +96,7 @@ class Data:
 
         # Create a range of timestamps starting from the activity start time
         start_time_local = da.start_date_local
-        timestamps = [
-            start_time_local + timedelta(seconds=i) for i in streams["time"].data
-        ]
+        timestamps = [start_time_local + timedelta(seconds=i) for i in streams["time"].data]
 
         # Convert to Polars DataFrame
         df_streams = pl.DataFrame(
@@ -126,18 +110,13 @@ class Data:
         ).with_columns(
             pl.col("datetime").cast(pl.Datetime),
             pl.lit(self.latest_activity_id).alias("activity_id"),
-            pl.when(pl.col("velocity") > 1)
-            .then((1000 / pl.col("velocity")) / 60)
-            .otherwise(None)
-            .alias("pace"),
+            pl.when(pl.col("velocity") > 1).then((1000 / pl.col("velocity")) / 60).otherwise(None).alias("pace"),
         )
         return (df_summary, df_streams)
 
     def get_carelink_data(self) -> pl.DataFrame | None:
         if self.latest_activity_id in self.activity_id_list:
-            logger.info(
-                f"Activity with id={self.latest_activity_id} already exists in the data"
-            )
+            logger.info(f"Activity with id={self.latest_activity_id} already exists in the data")
             return None
 
         client = CareLinkClient(tokenFile="logindata.json")
@@ -151,9 +130,7 @@ class Data:
             raise ValueError("Failed to get CareLink data")
 
         if self.latest_activity_id is None:
-            raise ValueError(
-                "Failed to get latest activity ID. You need to get Strava data first."
-            )
+            raise ValueError("Failed to get latest activity ID. You need to get Strava data first.")
 
         # Convert to Polars DataFrame
         # sgs = sensor glucose aka cgm
@@ -194,33 +171,30 @@ class Data:
 
         # Cast timestamp to datetime
         df = df.with_columns(
-            pl.col("timestamp")
-            .str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S")
-            .alias("datetime"),
+            pl.col("timestamp").str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S").alias("datetime"),
             pl.lit(self.latest_activity_id).alias("activity_id"),
         ).drop("timestamp")
 
         return df
 
+    def get_latest_data_and_save(self) -> None:
+        # Get Strava data
+        logger.info("Getting Strava data...")
+        strava_summary_data, strava_stream_data = self.get_strava_data()
+        # Get CareLink data
+        logger.info("Getting CareLink data...")
+        carelink_data = self.get_carelink_data()
 
-def get_latest_data_and_save(self):
-    # Get Strava data
-    logger.info("Getting Strava data...")
-    strava_summary_data, strava_stream_data = self.get_strava_data()
-    # Get CareLink data
-    logger.info("Getting CareLink data...")
-    carelink_data = self.get_carelink_data()
-
-    # Save as delta tables
-    if strava_summary_data is not None:
-        logger.info("Saving strava summary data...")
-        strava_summary_data.write_delta(self.STRAVA_SUMMARY_DIR, mode="append")
-    if strava_stream_data is not None:
-        logger.info("Saving strava stream data...")
-        strava_stream_data.write_delta(self.STRAVA_STREAM_DIR, mode="append")
-    if carelink_data is not None:
-        logger.info("Saving carelink data...")
-        carelink_data.write_delta(self.CARELINK_DIR, mode="append")
+        # Save as delta tables
+        if strava_summary_data is not None:
+            logger.info("Saving strava summary data...")
+            strava_summary_data.write_delta(self.STRAVA_SUMMARY_DIR, mode="append")
+        if strava_stream_data is not None:
+            logger.info("Saving strava stream data...")
+            strava_stream_data.write_delta(self.STRAVA_STREAM_DIR, mode="append")
+        if carelink_data is not None:
+            logger.info("Saving carelink data...")
+            carelink_data.write_delta(self.CARELINK_DIR, mode="append")
 
 
 if __name__ == "__main__":
