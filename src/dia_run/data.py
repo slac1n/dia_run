@@ -1,20 +1,19 @@
 from datetime import timedelta
-from pathlib import Path
 from typing import List, Tuple
 
 import polars as pl
 from loguru import logger
 
 from dia_run.carelink_client import CareLinkClient
+from dia_run.data_models.paths import DataPaths
 from dia_run.strava_client import authenticate_strava, stream_last_activity
 
 
 class Data:
-    def __init__(self):
-        self.DATA_DIR = Path("data")
-        self.STRAVA_SUMMARY_DIR = self.DATA_DIR / "strava" / "summary"
-        self.STRAVA_STREAM_DIR = self.DATA_DIR / "strava" / "stream"
-        self.CARELINK_DIR = self.DATA_DIR / "carelink"
+    def __init__(self, data_paths: DataPaths):
+        self.STRAVA_SUMMARY_DIR = data_paths.strava_summary
+        self.STRAVA_STREAM_DIR = data_paths.strava_stream
+        self.CARELINK_DIR = data_paths.carelink
         self.STRAVA_SUMMARY_DIR.mkdir(parents=True, exist_ok=True)
         self.STRAVA_STREAM_DIR.mkdir(parents=True, exist_ok=True)
         self.CARELINK_DIR.mkdir(parents=True, exist_ok=True)
@@ -225,5 +224,6 @@ def get_latest_data_and_save(self):
 
 
 if __name__ == "__main__":
-    data = Data()
-    get_latest_data_and_save(data)
+    data_paths = DataPaths()
+    data = Data(data_paths=data_paths)
+    data.get_latest_data_and_save()
