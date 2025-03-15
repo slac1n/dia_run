@@ -1,28 +1,45 @@
 from datetime import timedelta
-from typing import List, Tuple
+from pathlib import Path
 
 import polars as pl
 from loguru import logger
+from stravalib.client import Client
 
 from dia_run.carelink_client import CareLinkClient
 from dia_run.data_models.paths import DataPaths
-from dia_run.strava_client import authenticate_strava, stream_last_activity
+from dia_run.strava_client import get_strava_client, stream_last_activity
 
 
-class Data:
+class DataFetcher:
     def __init__(self, data_paths: DataPaths):
-        self.STRAVA_SUMMARY_DIR = data_paths.strava_summary
-        self.STRAVA_STREAM_DIR = data_paths.strava_stream
-        self.CARELINK_DIR = data_paths.carelink
+        self.STRAVA_SUMMARY_DIR: Path = data_paths.strava_summary
+        self.STRAVA_STREAM_DIR: Path = data_paths.strava_stream
+        self.CARELINK_DIR: Path = data_paths.carelink
         self.STRAVA_SUMMARY_DIR.mkdir(parents=True, exist_ok=True)
         self.STRAVA_STREAM_DIR.mkdir(parents=True, exist_ok=True)
         self.CARELINK_DIR.mkdir(parents=True, exist_ok=True)
-        self.latest_activity_id = None
-        self.activity_id_list = self.get_activity_ids()
+        self.latest_activity_id: int | None = None
+        self.activity_id_list: list[int] = self._get_activity_ids()
 
-    def get_activity_ids(self) -> List[int]:
+    def fetch_latest_data_and_save(self) -> None:
+        logger.info("Fetching Strava data...")
+        strava_summary_data, strava_stream_data = self._get_strava_data()
+        logger.info("Fetching CareLink data...")
+        carelink_data = self._get_carelink_data()
+
+        if strava_summary_data is not None:
+            logger.info("Saving strava summary data...")
+            strava_summary_data.write_delta(self.STRAVA_SUMMARY_DIR, mode="append")
+        if strava_stream_data is not None:
+            logger.info("Saving strava stream data...")
+            strava_stream_data.write_delta(self.STRAVA_STREAM_DIR, mode="append")
+        if carelink_data is not None:
+            logger.info("Saving carelink data...")
+            carelink_data.write_delta(self.CARELINK_DIR, mode="append")
+
+    def _get_activity_ids(self) -> list[int]:
         # Check if a Delta table exists
-        if not self.is_delta_table():
+        if not self._is_delta_table():
             return []
 
         # Load the Delta table using pl.scan_delta
@@ -33,12 +50,12 @@ class Data:
 
         return unique_activity_ids
 
-    def is_delta_table(self) -> bool:
+    def _is_delta_table(self) -> bool:
         delta_log = self.STRAVA_SUMMARY_DIR / "_delta_log"
         return delta_log.is_dir()
 
-    def get_strava_data(self) -> Tuple[pl.DataFrame | None, pl.DataFrame | None]:
-        client = authenticate_strava()
+    def _get_strava_data(self) -> tuple[pl.DataFrame | None, pl.DataFrame | None]:
+        client = get_strava_client()
         if not client:
             raise ValueError("Failed to authenticate Strava client")
 
@@ -59,11 +76,14 @@ class Data:
             return None, None
 
         # Process Strava data for the latest activity
-        df_summary, df_streams = self.process_latest_activity_id(client)
+        df_summary, df_streams = self._process_latest_activity_id(client)
 
         return df_summary, df_streams
 
-    def process_latest_activity_id(self, client) -> Tuple[pl.DataFrame, pl.DataFrame]:
+    def _process_latest_activity_id(self, client: Client) -> tuple[pl.DataFrame, pl.DataFrame]:
+        if self.latest_activity_id is None:
+            raise ValueError("Failed to get latest activity ID")
+
         # Get detailed activity data
         da = client.get_activity(self.latest_activity_id)
 
@@ -114,7 +134,7 @@ class Data:
         )
         return (df_summary, df_streams)
 
-    def get_carelink_data(self) -> pl.DataFrame | None:
+    def _get_carelink_data(self) -> pl.DataFrame | None:
         if self.latest_activity_id in self.activity_id_list:
             logger.info(f"Activity with id={self.latest_activity_id} already exists in the data")
             return None
@@ -177,27 +197,8 @@ class Data:
 
         return df
 
-    def get_latest_data_and_save(self) -> None:
-        # Get Strava data
-        logger.info("Getting Strava data...")
-        strava_summary_data, strava_stream_data = self.get_strava_data()
-        # Get CareLink data
-        logger.info("Getting CareLink data...")
-        carelink_data = self.get_carelink_data()
-
-        # Save as delta tables
-        if strava_summary_data is not None:
-            logger.info("Saving strava summary data...")
-            strava_summary_data.write_delta(self.STRAVA_SUMMARY_DIR, mode="append")
-        if strava_stream_data is not None:
-            logger.info("Saving strava stream data...")
-            strava_stream_data.write_delta(self.STRAVA_STREAM_DIR, mode="append")
-        if carelink_data is not None:
-            logger.info("Saving carelink data...")
-            carelink_data.write_delta(self.CARELINK_DIR, mode="append")
-
 
 if __name__ == "__main__":
     data_paths = DataPaths()
-    data = Data(data_paths=data_paths)
-    data.get_latest_data_and_save()
+    data_fetcher = DataFetcher(data_paths=data_paths)
+    data_fetcher.fetch_latest_data_and_save()
