@@ -178,9 +178,3 @@ class RunFuelQuestionnaire:
         self.ask_fueling_during_run()
         self.ask_bolus()
         self.save_to_json()
-
-
-# Example usage:
-if __name__ == "__main__":
-    questionnaire = RunFuelQuestionnaire()
-    questionnaire.ask_me()

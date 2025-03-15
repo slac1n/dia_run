@@ -5,9 +5,19 @@ import polars as pl
 from loguru import logger
 from stravalib.client import Client
 
-from dia_run.carelink_client import CareLinkClient
+from dia_run.data_fetcher.carelink_client import CareLinkClient
+from dia_run.data_fetcher.questionnaire import RunFuelQuestionnaire
 from dia_run.data_fetcher.strava_client import get_strava_client, stream_last_activity
 from dia_run.data_models.paths import DataPaths
+
+
+def run_fetcher() -> None:
+    data_paths = DataPaths()
+    data_fetcher = DataFetcher(data_paths=data_paths)
+    data_fetcher.fetch_latest_data_and_save()
+
+    questionnaire = RunFuelQuestionnaire()
+    questionnaire.ask_me()
 
 
 class DataFetcher:
@@ -196,9 +206,3 @@ class DataFetcher:
         ).drop("timestamp")
 
         return df
-
-
-if __name__ == "__main__":
-    data_paths = DataPaths()
-    data_fetcher = DataFetcher(data_paths=data_paths)
-    data_fetcher.fetch_latest_data_and_save()
