@@ -1,22 +1,25 @@
 import json
 from pathlib import Path
+from typing import Any
 
 import polars as pl
 import questionary
+from loguru import logger
+
+from dia_run.data_models.paths import DataPaths
 
 
 class RunFuelQuestionnaire:
-    def __init__(self, delta_table_path="data/strava/summary"):
-        self.delta_table_path = delta_table_path
-        self.activity_id = None
-        self.responses = {}
-        self.QUESTIONNAIRE_DIR = Path("data") / "run_questionnaires"
+    def __init__(self, data_paths: DataPaths):
+        self.STRAVA_SUMMARY_DIR: Path = data_paths.strava_summary
+        self.QUESTIONNAIRE_DIR: Path = data_paths.questionnaire
         self.QUESTIONNAIRE_DIR.mkdir(exist_ok=True)
+        self.activity_id: int | None = None
+        self.responses: dict[str, Any] = {}
 
-    def load_filtered_activities(self):
-        """Load activities, filtering out those that already have a JSON file."""
+    def load_filtered_activities(self) -> pl.DataFrame:
         # Read the delta table
-        df = pl.scan_delta(self.delta_table_path).select(["activity_id", "name", "start_date_local"]).collect()
+        df = pl.scan_delta(str(self.STRAVA_SUMMARY_DIR)).select(["activity_id", "name", "start_date_local"]).collect()
 
         # Filter out activities with existing JSON files
         existing_files = {int(f.stem) for f in self.QUESTIONNAIRE_DIR.glob("*.json")}
@@ -24,12 +27,11 @@ class RunFuelQuestionnaire:
 
         return df
 
-    def ask_activity_id(self):
-        """Ask for the activity ID based on name and date."""
+    def ask_activity_id(self) -> None:
         activities = self.load_filtered_activities()
 
         if activities.is_empty():
-            print("No new activities to process. All activities have associated JSON files.")
+            logger.info("No new activities to process. All activities have associated JSON files.")
             exit()
 
         # Prepare choices for the selection question
@@ -57,8 +59,7 @@ class RunFuelQuestionnaire:
             == selected
         )["activity_id"].item()
 
-    def ask_pre_run_info(self):
-        """Ask for pre-run fueling information."""
+    def ask_pre_run_info(self) -> None:
         did_fuel = questionary.confirm("Did you take any carbohydrates before the run?").ask()
 
         if not did_fuel:
@@ -79,8 +80,7 @@ class RunFuelQuestionnaire:
             "food_type": food_type,
         }
 
-    def ask_bolus(self):
-        """Ask for manual bolus information."""
+    def ask_bolus(self) -> None:
         bolus_entries = []
         while True:
             did_bolus = questionary.confirm("Did you administer a manual bolus?").ask()
@@ -102,8 +102,7 @@ class RunFuelQuestionnaire:
 
         self.responses["bolus"] = bolus_entries
 
-    def ask_basal_adjustments(self):
-        """Ask about basal adjustments before and during the run."""
+    def ask_basal_adjustments(self) -> None:
         adjustments = []
         while True:
             adjustment_type = questionary.select(
@@ -136,8 +135,7 @@ class RunFuelQuestionnaire:
 
         self.responses["basal_adjustments"] = adjustments
 
-    def ask_fueling_during_run(self):
-        """Ask about fueling during the run."""
+    def ask_fueling_during_run(self) -> None:
         fueling = []
         while True:
             took_fuel = questionary.confirm("Did you take carbohydrates during the run?").ask()
@@ -161,17 +159,15 @@ class RunFuelQuestionnaire:
 
         self.responses["fueling_during_run"] = fueling
 
-    def save_to_json(self):
-        """Save responses to a JSON file."""
+    def save_to_json(self) -> None:
         output_file = self.QUESTIONNAIRE_DIR / f"{self.activity_id}.json"
 
         with open(output_file, "w") as f:
             json.dump(self.responses, f, indent=4)
 
-        print(f"Questionnaire saved to {output_file}")
+        logger.info(f"Questionnaire saved to {output_file}")
 
-    def ask_me(self):
-        """Run the entire questionnaire."""
+    def ask_me(self) -> None:
         self.ask_activity_id()
         self.ask_pre_run_info()
         self.ask_basal_adjustments()
