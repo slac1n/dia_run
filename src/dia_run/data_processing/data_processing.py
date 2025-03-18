@@ -31,6 +31,12 @@ class DataProcessor:
                 & (pl.col("datetime") <= end_datetime + pl.duration(minutes=5))
                 & (pl.col("activity_id") == activity_id)
             )
+            .with_columns(
+                pl.when(pl.col("type") == "CGM")
+                .then(pl.col("value").replace(0.0, None))
+                .otherwise(pl.col("value"))
+                .alias("value")
+            )
             .collect()
         )
 
@@ -116,6 +122,7 @@ class DataProcessor:
                 (pl.col("datetime") >= pl.col("start_date_local") - pl.duration(minutes=5))
                 & (pl.col("datetime") <= pl.col("end_date_local") + pl.duration(minutes=5))
             )
+            .with_columns(pl.col("value").replace(0.0, None))
         )
 
     def _join_data(self, *, lf_left: pl.LazyFrame, lf_right: pl.LazyFrame) -> pl.LazyFrame:
