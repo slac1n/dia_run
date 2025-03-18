@@ -15,34 +15,13 @@ dependencies = [
   "polars>=1.19.0",
   "pyOpenSSL==24.0.0",
   "python-dotenv>=1.0.1",
+  "questionary>=2.1.0",
   "Requests==2.31.0",
   "selenium-wire>=5.1.0",
   "setuptools>=75.7.0",
   "stravalib>=2.1",
+  "streamlit>=1.41.1",
 ]
-
-[tool.ruff]
-exclude = [".venv","__pycache__", ".pytest_cache"]
-# Same as Black.
-line-length = 88
-indent-width = 4
-target-version = "py312"  # the python version to target, useful when considering code upgrades
-
-[tool.ruff.format]
-# Like Black, use double quotes for strings.
-quote-style = "double"
-
-# Like Black, indent with spaces, rather than tabs.
-indent-style = "space"
-
-# Like Black, respect magic trailing commas.
-skip-magic-trailing-comma = false
-
-# Like Black, automatically detect the appropriate line ending.
-line-ending = "auto"
-
-[tool.ruff.lint]
-select = ["B", "C", "E", "F", "W", "B9", "I"]
 
 [build-system]
 requires = ["hatchling"]
@@ -51,5 +30,43 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/dia_run"]
 
-[tool.basedpyright]
-typeCheckingMode = "standard"
+[project.scripts]
+fetch = "dia_run.data_fetcher.data_fetcher:run_fetcher"
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "D", "B", "I", "ARG"]
+ignore = [
+  "D100",
+  "D101",
+  "D102",
+  "D103",
+  "D104",
+  "D105",
+  "D106",
+  "D107",
+  "D203",
+  "D213",
+  "D417",
+]
+preview = true
+extend-select = ["PLR0917"]
+
+[tool.ruff.lint.pylint]
+max-positional-args = 1
+
+[tool.mypy]
+ignore_missing_imports = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "v$version"
+version_scheme = "semver"
+version_provider = "uv"
+update_changelog_on_bump = true
+bump_message = "release $current_version → $new_version [commitizen-skip-ci]"
