@@ -6,6 +6,8 @@ import polars as pl
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.run_types import RunType
 
+PRE_RUN_INSULIN_MINUTES = 180
+
 
 class DataProcessor:
     def __init__(self, data_paths: DataPaths | None = None):
@@ -16,7 +18,9 @@ class DataProcessor:
         if self.df_summary is None:
             lf_summary = self._load_summary_data()
             lf_agg_glucose = self._aggregate_glucose(lf_summary)
+            lf_agg_insulin_on_board = self._aggregate_insulin_on_board(lf_summary)
             lf_summary = self._join_data(lf_left=lf_summary, lf_right=lf_agg_glucose)
+            lf_summary = self._join_data(lf_left=lf_summary, lf_right=lf_agg_insulin_on_board)
             self.df_summary = lf_summary.collect()
 
         return self.df_summary
@@ -27,7 +31,7 @@ class DataProcessor:
         return (
             pl.scan_delta(str(self.data_paths.carelink))
             .filter(
-                (pl.col("datetime") >= start_datetime - pl.duration(hours=2))
+                (pl.col("datetime") >= start_datetime - pl.duration(minutes=PRE_RUN_INSULIN_MINUTES))
                 & (pl.col("datetime") <= end_datetime + pl.duration(minutes=5))
                 & (pl.col("activity_id") == activity_id)
             )
@@ -123,6 +127,42 @@ class DataProcessor:
                 & (pl.col("datetime") <= pl.col("end_date_local") + pl.duration(minutes=5))
             )
             .with_columns(pl.col("value").replace(0.0, None))
+        )
+
+    def _aggregate_insulin_on_board(self, lf_right: pl.LazyFrame) -> pl.LazyFrame:
+        expression = (
+            (
+                pl.col("value")
+                * (
+                    1
+                    - ((pl.col("start_date_local") - pl.col("datetime")).dt.total_seconds() / 60)
+                    / PRE_RUN_INSULIN_MINUTES
+                )
+            )
+            .clip(lower_bound=0.0)
+            .alias("insulin_on_board_in_going")
+        )
+        return (
+            self._load_pre_run_insulin_data(lf_right.select("activity_id", "start_date_local", "end_date_local"))
+            .with_columns(expression)
+            .group_by("activity_id")
+            .agg(pl.sum("insulin_on_board_in_going"))
+        )
+
+    def _load_pre_run_insulin_data(self, lf_right: pl.LazyFrame) -> pl.LazyFrame:
+        return (
+            pl.scan_delta(str(self.data_paths.carelink))
+            .filter(pl.col("type").is_in(["AUTO_BASAL_DELIVERY", "INSULIN"]))
+            .select(["value", "activity_id", "datetime"])
+            .join(
+                lf_right,
+                on="activity_id",
+                how="inner",
+            )
+            .filter(
+                (pl.col("datetime") >= pl.col("start_date_local") - pl.duration(minutes=PRE_RUN_INSULIN_MINUTES))
+                & (pl.col("datetime") <= pl.col("start_date_local") + pl.duration(minutes=5))
+            )
         )
 
     def _join_data(self, *, lf_left: pl.LazyFrame, lf_right: pl.LazyFrame) -> pl.LazyFrame:

@@ -35,6 +35,7 @@ with tab1:
             "human_readable_pace",
             "average_heartrate",
             "kilojoules",
+            "insulin_on_board_in_going",
             "in_going_sg",
             "out_going_sg",
             "avg_sg",
