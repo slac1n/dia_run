@@ -1,3 +1,9 @@
+## v0.3.0 (2025-03-19)
+
+### Feat
+
+- Calculate insulin on board at start (#4)
+
 ## v0.2.0 (2025-03-18)
 
 ### Feat
