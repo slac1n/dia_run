@@ -31,7 +31,7 @@ class DataProcessor:
         return (
             pl.scan_delta(str(self.data_paths.carelink))
             .filter(
-                (pl.col("datetime") >= start_datetime - pl.duration(hours=2))
+                (pl.col("datetime") >= start_datetime - pl.duration(minutes=PRE_RUN_INSULIN_MINUTES))
                 & (pl.col("datetime") <= end_datetime + pl.duration(minutes=5))
                 & (pl.col("activity_id") == activity_id)
             )
