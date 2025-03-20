@@ -1,6 +1,10 @@
 import polars as pl
 import streamlit as st
 
+from dia_run.dashboard.charts.diabetes_management import (
+    create_in_going_out_going_sensor_glucose_chart,
+    create_insulin_on_board_and_normalized_glucose_change_chart,
+)
 from dia_run.dashboard.charts.run_types import (
     create_run_type_distance_chart,
     create_run_type_glucose_chart,
@@ -23,7 +27,7 @@ st.set_page_config(
 )
 
 st.title("Dia-Run Dashboard")
-tab1, tab2 = st.tabs(["General", "Run Type Analysis"])
+tab1, tab2, tab3 = st.tabs(["Activities", "Run Type Analysis", "Diabetes Insights"])
 
 with tab1:
     st.header("Overview of Running Activities :runner:")
@@ -50,7 +54,7 @@ with tab1:
     )
 
     if name_date is not None:
-        st.subheader("Diabetes Managment :syringe:")
+        st.subheader("Diabetes Management :syringe:")
         activity_id = df_summary.filter(pl.col("name_date") == name_date).select("activity_id")["activity_id"][0]
         st.plotly_chart(
             create_single_activity_carelink_chart(data_processor=data_processor, activity_id=activity_id),
@@ -86,24 +90,34 @@ with tab1:
             else:
                 st.markdown("No fueling during run")
 
-    with tab2:
-        run_type_order = [RunType.EASY, RunType.INTERVAL, RunType.TEMPO, RunType.LONG]
-        left_column, right_column = st.columns(2)
-        with left_column:
-            st.plotly_chart(create_run_type_pie_chart(data_processor), use_container_width=True)
+with tab2:
+    run_type_order = [RunType.EASY, RunType.INTERVAL, RunType.TEMPO, RunType.LONG]
+    left_column, right_column = st.columns(2)
+    with left_column:
+        st.plotly_chart(create_run_type_pie_chart(data_processor), use_container_width=True)
 
-        with right_column:
-            st.plotly_chart(
-                create_run_type_distance_chart(data_processor=data_processor, run_type_order=run_type_order),
-                use_container_width=True,
-            )
-
+    with right_column:
         st.plotly_chart(
-            create_run_type_heartrate_chart(data_processor=data_processor, run_type_order=run_type_order),
+            create_run_type_distance_chart(data_processor=data_processor, run_type_order=run_type_order),
             use_container_width=True,
         )
 
-        st.plotly_chart(
-            create_run_type_glucose_chart(data_processor=data_processor, run_type_order=run_type_order),
-            use_container_width=True,
-        )
+    st.plotly_chart(
+        create_run_type_heartrate_chart(data_processor=data_processor, run_type_order=run_type_order),
+        use_container_width=True,
+    )
+
+    st.plotly_chart(
+        create_run_type_glucose_chart(data_processor=data_processor, run_type_order=run_type_order),
+        use_container_width=True,
+    )
+
+with tab3:
+    st.plotly_chart(
+        create_in_going_out_going_sensor_glucose_chart(data_processor=data_processor),
+        use_container_width=True,
+    )
+    st.plotly_chart(
+        create_insulin_on_board_and_normalized_glucose_change_chart(data_processor=data_processor),
+        use_container_width=True,
+    )
