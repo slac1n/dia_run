@@ -61,3 +61,27 @@ def create_in_going_out_going_sensor_glucose_chart(data_processor: DataProcessor
     )
 
     return fig
+
+
+def create_insulin_on_board_and_normalized_glucose_change_chart(data_processor: DataProcessor) -> px.scatter:
+    df_summary = data_processor.get_summary()
+    df_summary = df_summary.with_columns(
+        (
+            (pl.col("out_going_sg") - pl.col("in_going_sg"))
+            / ((pl.col("end_date_local") - pl.col("start_date_local")).dt.total_seconds() / 60)
+        ).alias("normalized_glucose_change")
+    )
+    fig = px.scatter(
+        data_frame=df_summary,
+        x="insulin_on_board_in_going",
+        y="normalized_glucose_change",
+        trendline="ols",
+        custom_data={"name_date"},
+    )
+    fig.update_traces(hovertemplate="<b>%{customdata[0]}</b>")
+    fig.update_layout(
+        title="Insulin on Board at Start vs. Normalized Change in Sensor Glucose",
+        xaxis_title="Insulin on Board at Start [U]",
+        yaxis_title="Normalized Sensor Glucose Change <br>During Activity [mg/dl/min]",
+    )
+    return fig
