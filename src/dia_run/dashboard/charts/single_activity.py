@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import plotly.graph_objects as go
 import polars as pl
@@ -60,8 +60,8 @@ def create_single_activity_carelink_chart(*, data_processor: DataProcessor, acti
             secondary_y=True,
         )
 
-    fig.add_vline(x=start_datetime, line_width=1, line_dash="dash", line_color="green")
-    fig.add_vline(x=end_datetime, line_width=1, line_dash="dash", line_color="red")
+    _add_vertical_line(fig=fig, datetime_instance=start_datetime, color="green", name="Start")
+    _add_vertical_line(fig=fig, datetime_instance=end_datetime, color="red", name="End")
 
     fig.add_shape(
         type="rect",
@@ -78,23 +78,32 @@ def create_single_activity_carelink_chart(*, data_processor: DataProcessor, acti
     )
 
     if questionnaire["pre_run"]:
-        prerun_time = int(questionnaire["pre_run"]["time_before_start_min"])
+        prerun_time_diff = int(questionnaire["pre_run"]["time_before_start_min"])
 
-        if prerun_time < 0:
+        if prerun_time_diff < 0:
             # make time absolute
-            prerun_time = abs(prerun_time)
-            prerun_time = start_datetime - timedelta(minutes=prerun_time)
-        fig.add_vline(x=prerun_time, line_width=1, line_dash="dash", line_color="orange")
+            prerun_time_diff = abs(prerun_time_diff)
+            prerun_time = start_datetime - timedelta(minutes=prerun_time_diff)
+            _add_vertical_line(fig=fig, datetime_instance=prerun_time, color="orange", name="Pre-Run Nutrition")
 
     if questionnaire["fueling_during_run"]:
-        for fuel in questionnaire["fueling_during_run"]:
-            fuel_time = int(fuel["time_during_run_min"])
-            fuel_time = start_datetime + timedelta(minutes=fuel_time)
-            fig.add_vline(
-                x=fuel_time,
-                line_width=1,
-                line_dash="dash",
-                line_color="blue",
+        for fuel_instance, fuel in enumerate(questionnaire["fueling_during_run"]):
+            fuel_time_diff = int(fuel["time_during_run_min"])
+            fuel_time = start_datetime + timedelta(minutes=fuel_time_diff)
+            _add_vertical_line(
+                fig=fig, datetime_instance=fuel_time, color="blue", name=f"Fueling {int(fuel_instance) + 1}"
             )
 
     return fig
+
+
+def _add_vertical_line(*, fig: go.Figure, datetime_instance: datetime, color: str, name: str) -> None:
+    fig.add_trace(
+        go.Scatter(
+            x=[datetime_instance, datetime_instance],
+            y=[70, 250],
+            mode="lines",
+            name=name,
+            line=dict(color=color, width=1, dash="dash"),
+        )
+    )
