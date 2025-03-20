@@ -86,24 +86,24 @@ with tab1:
             else:
                 st.markdown("No fueling during run")
 
-    with tab2:
-        run_type_order = [RunType.EASY, RunType.INTERVAL, RunType.TEMPO, RunType.LONG]
-        left_column, right_column = st.columns(2)
-        with left_column:
-            st.plotly_chart(create_run_type_pie_chart(data_processor), use_container_width=True)
+with tab2:
+    run_type_order = [RunType.EASY, RunType.INTERVAL, RunType.TEMPO, RunType.LONG]
+    left_column, right_column = st.columns(2)
+    with left_column:
+        st.plotly_chart(create_run_type_pie_chart(data_processor), use_container_width=True)
 
-        with right_column:
-            st.plotly_chart(
-                create_run_type_distance_chart(data_processor=data_processor, run_type_order=run_type_order),
-                use_container_width=True,
-            )
-
+    with right_column:
         st.plotly_chart(
-            create_run_type_heartrate_chart(data_processor=data_processor, run_type_order=run_type_order),
+            create_run_type_distance_chart(data_processor=data_processor, run_type_order=run_type_order),
             use_container_width=True,
         )
 
-        st.plotly_chart(
-            create_run_type_glucose_chart(data_processor=data_processor, run_type_order=run_type_order),
-            use_container_width=True,
-        )
+    st.plotly_chart(
+        create_run_type_heartrate_chart(data_processor=data_processor, run_type_order=run_type_order),
+        use_container_width=True,
+    )
+
+    st.plotly_chart(
+        create_run_type_glucose_chart(data_processor=data_processor, run_type_order=run_type_order),
+        use_container_width=True,
+    )
