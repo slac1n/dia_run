@@ -19,6 +19,7 @@ dependencies = [
   "Requests==2.31.0",
   "selenium-wire>=5.1.0",
   "setuptools>=75.7.0",
+  "statsmodels>=0.14.4",
   "stravalib>=2.1",
   "streamlit>=1.41.1",
 ]
