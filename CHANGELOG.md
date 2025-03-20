@@ -1,3 +1,9 @@
+## v0.4.0 (2025-03-20)
+
+### Feat
+
+- display relation between glucose behavior and insulin on board (#5)
+
 ## v0.3.0 (2025-03-19)
 
 ### Feat
