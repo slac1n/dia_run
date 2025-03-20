@@ -50,7 +50,7 @@ with tab1:
     )
 
     if name_date is not None:
-        st.subheader("Diabetes Managment :syringe:")
+        st.subheader("Diabetes Management :syringe:")
         activity_id = df_summary.filter(pl.col("name_date") == name_date).select("activity_id")["activity_id"][0]
         st.plotly_chart(
             create_single_activity_carelink_chart(data_processor=data_processor, activity_id=activity_id),
