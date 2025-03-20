@@ -1,6 +1,10 @@
 import polars as pl
 import streamlit as st
 
+from dia_run.dashboard.charts.diabetes_management import (
+    create_in_going_out_going_sensor_glucose_chart,
+    create_insulin_on_board_and_normalized_glucose_change_chart,
+)
 from dia_run.dashboard.charts.run_types import (
     create_run_type_distance_chart,
     create_run_type_glucose_chart,
@@ -105,5 +109,15 @@ with tab2:
 
     st.plotly_chart(
         create_run_type_glucose_chart(data_processor=data_processor, run_type_order=run_type_order),
+        use_container_width=True,
+    )
+
+with tab3:
+    st.plotly_chart(
+        create_in_going_out_going_sensor_glucose_chart(data_processor=data_processor),
+        use_container_width=True,
+    )
+    st.plotly_chart(
+        create_insulin_on_board_and_normalized_glucose_change_chart(data_processor=data_processor),
         use_container_width=True,
     )
