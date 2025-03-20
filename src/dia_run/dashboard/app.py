@@ -23,7 +23,7 @@ st.set_page_config(
 )
 
 st.title("Dia-Run Dashboard")
-tab1, tab2 = st.tabs(["General", "Run Type Analysis"])
+tab1, tab2, tab3 = st.tabs(["Activities", "Run Type Analysis", "Diabetes Insights"])
 
 with tab1:
     st.header("Overview of Running Activities :runner:")
