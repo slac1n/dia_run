@@ -1,6 +1,7 @@
 import polars as pl
 import streamlit as st
 
+from dia_run.dashboard.charts.activity_calendar import create_activity_calendar_chart
 from dia_run.dashboard.charts.diabetes_management import (
     create_in_going_out_going_sensor_glucose_chart,
     create_insulin_on_board_and_normalized_glucose_change_chart,
@@ -31,6 +32,7 @@ tab1, tab2, tab3 = st.tabs(["Activities", "Run Type Analysis", "Diabetes Insight
 
 with tab1:
     st.header("Overview of Running Activities :runner:")
+    st.plotly_chart(create_activity_calendar_chart(df_summary), use_container_width=True)
     st.write(
         df_summary.select(
             "name",
