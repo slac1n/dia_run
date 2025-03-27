@@ -33,20 +33,19 @@ tab1, tab2, tab3 = st.tabs(["Activities", "Run Type Analysis", "Diabetes Insight
 with tab1:
     st.header("Overview of Running Activities :runner:")
     st.plotly_chart(create_activity_calendar_chart(df_summary), use_container_width=True)
-    st.write(
-        df_summary.select(
-            "name",
-            "distance_in_km",
-            "human_readable_time",
-            "human_readable_pace",
-            "average_heartrate",
-            "kilojoules",
-            "insulin_on_board_in_going",
-            "in_going_sg",
-            "out_going_sg",
-            "avg_sg",
-        )
-    )
+    rename_dict = {
+        "name": "Activity Name",
+        "date": "Date",
+        "distance_in_km": "Distance",
+        "human_readable_time": "Time",
+        "human_readable_pace": "Pace",
+        "average_heartrate": "Avg. Heartrate",
+        "insulin_on_board_in_going": "Insulin on Board",
+        "avg_sg": "Avg. SG",
+        "in_going_sg": "In Going SG",
+        "out_going_sg": "Out Going SG",
+    }
+    st.write(df_summary.select(rename_dict.keys()).rename(rename_dict))
     st.header("Activity Details :mag:")
     name_date = st.selectbox(
         "Select an activity",

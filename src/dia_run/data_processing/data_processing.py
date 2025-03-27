@@ -87,6 +87,7 @@ class DataProcessor:
                 pl.col("name"),  # and only the date
                 pl.col("start_date_local").dt.date(),
             ).alias("name_date"),
+            pl.col("start_date_local").dt.strftime("%Y-%m-%d").alias("date"),
             pl.when(pl.col("name").str.contains(RunType.get_keyword(RunType.EASY)))
             .then(pl.lit(RunType.EASY))
             .when(pl.col("name").str.contains(RunType.get_keyword(RunType.INTERVAL)))
