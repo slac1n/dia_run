@@ -1,3 +1,9 @@
+## v0.5.0 (2025-03-27)
+
+### Feat
+
+- Implement running activity calender (#7)
+
 ## v0.4.0 (2025-03-20)
 
 ### Feat
