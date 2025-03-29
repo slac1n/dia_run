@@ -158,15 +158,15 @@ def strava_stream_data() -> pl.DataFrame:
 
 
 @pytest.fixture(scope="session")
-def questionnaire_data() -> dict[str, dict]:
+def questionnaire_data() -> dict[int, dict]:
     return {
-        "1001": {
+        1001: {
             "pre_run": [],
             "basal_adjustments": [],
             "fueling_during_run": [],
             "bolus": [],
         },
-        "1002": {
+        1002: {
             "pre_run": {
                 "carbohydrates_g": "30",
                 "time_before_start_min": "-30",
@@ -185,7 +185,7 @@ def questionnaire_data() -> dict[str, dict]:
             "fueling_during_run": [{"carbohydrates_g": "15", "time_during_run_min": "15", "food_type": "Energy Gel"}],
             "bolus": {"time_of_bolus_min": "20", "bolus_units": "0.5"},
         },
-        "1003": {
+        1003: {
             "pre_run": {
                 "carbohydrates_g": "40",
                 "time_before_start_min": "-60",
