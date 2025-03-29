@@ -24,6 +24,13 @@ dependencies = [
   "streamlit>=1.41.1",
 ]
 
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3.4",
+  "pytest-cov>=6.0.0",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -63,6 +70,10 @@ ignore_missing_imports = true
 disallow_untyped_calls = true
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
+
+[tool.pytest.ini_options]
+addopts = "--cov-config=.coveragerc"
+testpaths = ["tests", "src"]
 
 [tool.commitizen]
 name = "cz_conventional_commits"
