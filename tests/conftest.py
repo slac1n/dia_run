@@ -158,7 +158,7 @@ def strava_stream_data() -> pl.DataFrame:
 
 
 @pytest.fixture(scope="session")
-def questionnaire_data() -> dict[int, dict]:
+def questionnaire_data() -> dict[str, dict]:
     return {
         "1001": {
             "pre_run": [],
