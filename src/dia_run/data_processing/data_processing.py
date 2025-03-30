@@ -41,6 +41,7 @@ class DataProcessor:
                 .otherwise(pl.col("value"))
                 .alias("value")
             )
+            .drop("activity_id")
             .collect()
         )
 
