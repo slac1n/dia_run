@@ -1,3 +1,9 @@
+## v0.5.1 (2025-03-30)
+
+### Fix
+
+- Remove unused activity id column (#11)
+
 ## v0.5.0 (2025-03-27)
 
 ### Feat
