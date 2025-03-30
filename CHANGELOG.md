@@ -1,3 +1,9 @@
+## v0.5.2 (2025-03-30)
+
+### Fix
+
+- Filter specific carelink data types (#12)
+
 ## v0.5.1 (2025-03-30)
 
 ### Fix
