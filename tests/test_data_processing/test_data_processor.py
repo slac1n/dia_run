@@ -4,6 +4,7 @@ import polars as pl
 
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.run_types import RunType
+from dia_run.data_models.schemas import SummarySchema
 from dia_run.data_processing.data_processing import PRE_RUN_INSULIN_MINUTES, DataProcessor
 
 
@@ -12,7 +13,7 @@ class TestDataProcessor:
         processor = DataProcessor(test_data_paths)
         result = processor.get_summary()
 
-        assert isinstance(result, pl.DataFrame)
+        SummarySchema.validate(result)
         assert len(result) == 3
         assert set(result["activity_id"].to_list()) == {1001, 1002, 1003}
 
