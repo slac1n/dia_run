@@ -2,9 +2,11 @@ import json
 from datetime import datetime
 
 import polars as pl
+from pandera.typing.polars import DataFrame
 
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.run_types import RunType
+from dia_run.data_models.schemas import SummarySchema
 
 PRE_RUN_INSULIN_MINUTES = 180
 
@@ -14,7 +16,7 @@ class DataProcessor:
         self.data_paths = data_paths or DataPaths()
         self.df_summary: pl.DataFrame | None = None
 
-    def get_summary(self) -> pl.DataFrame:
+    def get_summary(self) -> DataFrame[SummarySchema]:
         if self.df_summary is None:
             lf_summary = self._load_summary_data()
             lf_agg_glucose = self._aggregate_glucose(lf_summary)
