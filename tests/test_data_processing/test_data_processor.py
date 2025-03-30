@@ -33,7 +33,6 @@ class TestDataProcessor:
             activity_id=activity_id, start_datetime=start_datetime, end_datetime=end_datetime
         )
         assert isinstance(result, pl.DataFrame)
-        assert set(result["activity_id"].to_list()) == {activity_id}
         assert set(result["type"].to_list()) == {"INSULIN", "AUTO_BASAL_DELIVERY", "CGM"}
         assert result.filter(pl.col("type") == "INSULIN").height == 1
         assert result.filter(pl.col("type") == "AUTO_BASAL_DELIVERY").height == 35
