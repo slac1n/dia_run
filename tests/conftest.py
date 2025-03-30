@@ -40,10 +40,19 @@ def strava_summary_data() -> pl.DataFrame:
                 datetime(2025, 3, 26, 18, 0, 0),
                 datetime(2025, 3, 27, 14, 0, 0),
             ],
+            "distance": [5000.0, 8000.0, 20000.0],
+            "moving_time": [1800, 3600, 7200],
             "elapsed_time": [1800, 3600, 7200],
-            "distance": [5000, 8000, 20000],
+            "total_elevation_gain": [50.0, 100.0, 200.0],
+            "average_heartrate": [145.0, 165.0, 152.0],
+            "max_heartrate": [160, 180, 165],
+            "average_speed": [2.8, 2.2, 2.5],
+            "max_speed": [3.0, 4.0, 3.0],
+            "average_watts": [150.0, 200.0, 175.0],
+            "max_watts": [200, 250, 225],
+            "kilojoules": [500.0, 800.0, 1000.0],
             "average_pace": [5.5, 4.5, 6.0],
-            "average_heartrate": [145, 165, 152],
+            "max_pace": [5.0, 4.0, 5.5],
         }
     )
 
