@@ -44,4 +44,5 @@ class SpecificCarelinkSchema(DataFrameModel):
 
 class HeartrateStreamsSchema(DataFrameModel):
     heartrate: Series[int] = Field(nullable=True, gt=0)
+    datetime: Series[datetime]
     run_type: Series[str] = Field(isin=[rt.value for rt in RunType])
