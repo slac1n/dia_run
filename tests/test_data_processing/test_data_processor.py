@@ -4,7 +4,7 @@ import polars as pl
 
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.run_types import RunType
-from dia_run.data_models.schemas import SummarySchema
+from dia_run.data_models.schemas import SpecificCarelinkSchema, SummarySchema
 from dia_run.data_processing.data_processing import PRE_RUN_INSULIN_MINUTES, DataProcessor
 
 
@@ -33,7 +33,7 @@ class TestDataProcessor:
         result = processor.get_specific_carelink(
             activity_id=activity_id, start_datetime=start_datetime, end_datetime=end_datetime
         )
-        assert isinstance(result, pl.DataFrame)
+        SpecificCarelinkSchema.validate(result)
         assert set(result["type"].to_list()) == {"INSULIN", "AUTO_BASAL_DELIVERY", "CGM"}
         assert result.filter(pl.col("type") == "INSULIN").height == 1
         assert result.filter(pl.col("type") == "AUTO_BASAL_DELIVERY").height == 35

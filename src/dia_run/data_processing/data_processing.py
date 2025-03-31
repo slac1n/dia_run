@@ -6,7 +6,7 @@ from pandera.typing.polars import DataFrame
 
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.run_types import RunType
-from dia_run.data_models.schemas import SummarySchema
+from dia_run.data_models.schemas import SummarySchema, SpecificCarelinkSchema
 
 PRE_RUN_INSULIN_MINUTES = 180
 
@@ -29,7 +29,7 @@ class DataProcessor:
 
     def get_specific_carelink(
         self, *, activity_id: int, start_datetime: datetime, end_datetime: datetime
-    ) -> pl.DataFrame:
+    ) -> DataFrame[SpecificCarelinkSchema]:
         return (
             pl.scan_delta(str(self.data_paths.carelink))
             .filter(
