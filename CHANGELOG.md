@@ -1,3 +1,9 @@
+## v0.5.3 (2025-03-31)
+
+### Fix
+
+- add datetime to heartrate streams (#13)
+
 ## v0.5.2 (2025-03-30)
 
 ### Fix

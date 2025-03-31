@@ -138,26 +138,31 @@ def strava_stream_data() -> pl.DataFrame:
     data = []
 
     # Activity 1001 - Easy Run
+    run_start = datetime(2025, 3, 25, 10, 0, 0)
     for i in range(0, 30):
         data.append(
             {
+                "datetime": run_start + timedelta(minutes=i),
                 "activity_id": 1001,
                 "heartrate": 140 + i % 10,
             }
         )
 
     # Activity 1002 - Interval Training
+    run_start = datetime(2025, 3, 26, 18, 0, 0)
     for i in range(0, 60):
         if (i // 5) % 2 == 0:
             hr = 170 + i % 10
         else:
             hr = 150 + i % 10
-        data.append({"activity_id": 1002, "heartrate": hr})
+        data.append({"datetime": run_start + timedelta(minutes=i), "activity_id": 1002, "heartrate": hr})
 
     # Activity 1003 - Long Run
+    run_start = datetime(2025, 3, 27, 14, 0, 0)
     for i in range(0, 120):
         data.append(
             {
+                "datetime": run_start + timedelta(minutes=i),
                 "activity_id": 1003,
                 "heartrate": 150 + i % 15,
             }
