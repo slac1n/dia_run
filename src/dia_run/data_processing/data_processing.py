@@ -54,7 +54,7 @@ class DataProcessor:
         lf_summary = self._load_summary_data()
         return (
             pl.scan_delta(str(self.data_paths.strava_stream))
-            .select(["heartrate", "activity_id"])
+            .select(["datetime", "heartrate", "activity_id"])
             .join(lf_summary.select(["activity_id", "run_type"]), on="activity_id", how="left")
             .select(pl.exclude("activity_id"))
         ).collect()
