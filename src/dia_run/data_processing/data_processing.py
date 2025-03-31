@@ -36,6 +36,7 @@ class DataProcessor:
                 (pl.col("datetime") >= start_datetime - pl.duration(minutes=PRE_RUN_INSULIN_MINUTES))
                 & (pl.col("datetime") <= end_datetime + pl.duration(minutes=5))
                 & (pl.col("activity_id") == activity_id)
+                & (pl.col("type").is_in(["CGM", "AUTO_BASAL_DELIVERY", "INSULIN"]))
             )
             .with_columns(
                 pl.when(pl.col("type") == "CGM")
