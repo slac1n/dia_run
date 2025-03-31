@@ -46,3 +46,9 @@ class HeartrateStreamsSchema(DataFrameModel):
     heartrate: Series[int] = Field(nullable=True, gt=0)
     datetime: Series[datetime]
     run_type: Series[str] = Field(isin=[rt.value for rt in RunType])
+
+
+class GlucoseStreamsSchema(DataFrameModel):
+    value: Series[float] = Field(nullable=True, gt=0)
+    datetime: Series[datetime]
+    run_type: Series[str] = Field(isin=[rt.value for rt in RunType])
