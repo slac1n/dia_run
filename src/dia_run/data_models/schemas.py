@@ -40,3 +40,8 @@ class SpecificCarelinkSchema(DataFrameModel):
     datetime: Series[datetime]
     type: Series[str] = Field(isin=["CGM", "AUTO_BASAL_DELIVERY", "INSULIN"])
     value: Series[float] = Field(nullable=True, gt=0)
+
+
+class HeartrateStreamsSchema(DataFrameModel):
+    heartrate: Series[int] = Field(nullable=True, gt=0)
+    run_type: Series[str] = Field(isin=[rt.value for rt in RunType])
