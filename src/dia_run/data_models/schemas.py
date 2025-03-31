@@ -34,3 +34,9 @@ class SummarySchema(DataFrameModel):
     out_going_sg: Series[float] = Field(nullable=True, gt=0)
     avg_sg: Series[float] = Field(nullable=True, gt=0)
     insulin_on_board_in_going: Series[float] = Field(ge=0)
+
+
+class SpecificCarelinkSchema(DataFrameModel):
+    datetime: Series[datetime]
+    type: Series[str] = Field(isin=["CGM", "AUTO_BASAL_DELIVERY", "INSULIN"])
+    value: Series[float] = Field(nullable=True, gt=0)
