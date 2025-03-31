@@ -6,7 +6,7 @@ from pandera.typing.polars import DataFrame
 
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.run_types import RunType
-from dia_run.data_models.schemas import SummarySchema, SpecificCarelinkSchema
+from dia_run.data_models.schemas import HeartrateStreamsSchema, SpecificCarelinkSchema, SummarySchema
 
 PRE_RUN_INSULIN_MINUTES = 180
 
@@ -52,7 +52,7 @@ class DataProcessor:
         with open(self.data_paths.questionnaire / f"{activity_id}.json") as f:
             return json.load(f)
 
-    def get_heartrate_streams(self) -> pl.DataFrame:
+    def get_heartrate_streams(self) -> DataFrame[HeartrateStreamsSchema]:
         lf_summary = self._load_summary_data()
         return (
             pl.scan_delta(str(self.data_paths.strava_stream))
