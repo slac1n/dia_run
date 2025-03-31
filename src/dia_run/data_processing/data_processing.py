@@ -6,7 +6,12 @@ from pandera.typing.polars import DataFrame
 
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.run_types import RunType
-from dia_run.data_models.schemas import HeartrateStreamsSchema, SpecificCarelinkSchema, SummarySchema
+from dia_run.data_models.schemas import (
+    GlucoseStreamsSchema,
+    HeartrateStreamsSchema,
+    SpecificCarelinkSchema,
+    SummarySchema,
+)
 
 PRE_RUN_INSULIN_MINUTES = 180
 
@@ -61,7 +66,7 @@ class DataProcessor:
             .select(pl.exclude("activity_id"))
         ).collect()
 
-    def get_glucose_streams(self) -> pl.DataFrame:
+    def get_glucose_streams(self) -> DataFrame[GlucoseStreamsSchema]:
         lf_summary = self._load_summary_data()
         return (
             self._load_glucose_data(lf_summary.select("activity_id", "start_date_local", "end_date_local", "run_type"))

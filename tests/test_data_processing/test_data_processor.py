@@ -4,7 +4,12 @@ import polars as pl
 
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.run_types import RunType
-from dia_run.data_models.schemas import SpecificCarelinkSchema, SummarySchema, HeartrateStreamsSchema
+from dia_run.data_models.schemas import (
+    GlucoseStreamsSchema,
+    HeartrateStreamsSchema,
+    SpecificCarelinkSchema,
+    SummarySchema,
+)
 from dia_run.data_processing.data_processing import PRE_RUN_INSULIN_MINUTES, DataProcessor
 
 
@@ -107,7 +112,7 @@ class TestDataProcessor:
         processor = DataProcessor(test_data_paths)
         result = processor.get_glucose_streams()
 
-        assert isinstance(result, pl.DataFrame)
+        GlucoseStreamsSchema.validate(result)
         assert set(result["run_type"].to_list()) == {RunType.EASY, RunType.INTERVAL, RunType.LONG}
 
         easy_gs = result.filter(pl.col("run_type") == RunType.EASY)["value"]
