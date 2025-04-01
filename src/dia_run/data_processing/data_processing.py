@@ -8,6 +8,7 @@ from pandera.typing.polars import DataFrame, LazyFrame
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.run_types import RunType
 from dia_run.data_models.schemas import (
+    AggregatedGlucoseSchema,
     GlucoseStreamsSchema,
     HeartrateStreamsSchema,
     SpecificCarelinkSchema,
@@ -111,7 +112,7 @@ class DataProcessor:
             .alias("run_type"),
         )
 
-    def _aggregate_glucose(self, lf_right: pl.LazyFrame) -> pl.LazyFrame:
+    def _aggregate_glucose(self, lf_right: LazyFrame[StravaSummarySchema]) -> LazyFrame[AggregatedGlucoseSchema]:
         return (
             self._load_glucose_data(lf_right.select("activity_id", "start_date_local", "end_date_local"))
             .group_by("activity_id")
