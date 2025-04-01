@@ -6,7 +6,7 @@ from pandera.typing import Series
 from dia_run.data_models.run_types import RunType
 
 
-class SummarySchema(DataFrameModel):
+class StravaSummarySchema(DataFrameModel):
     activity_id: Series[int] = Field(unique=True)
     name: Series[str]
     start_date_local: Series[datetime]
@@ -30,6 +30,9 @@ class SummarySchema(DataFrameModel):
     name_date: Series[str]
     date: Series[str]
     run_type: Series[str] = Field(isin=[rt.value for rt in RunType])
+
+
+class SummarySchema(StravaSummarySchema):
     in_going_sg: Series[float] = Field(nullable=True, gt=0)
     out_going_sg: Series[float] = Field(nullable=True, gt=0)
     avg_sg: Series[float] = Field(nullable=True, gt=0)
@@ -42,13 +45,14 @@ class SpecificCarelinkSchema(DataFrameModel):
     value: Series[float] = Field(nullable=True, gt=0)
 
 
-class HeartrateStreamsSchema(DataFrameModel):
+class StreamsSchema(DataFrameModel):
+    datetime: Series[datetime]
+    run_type: Series[str] = Field(isin=[rt.value for rt in RunType])
+
+
+class HeartrateStreamsSchema(StreamsSchema):
     heartrate: Series[int] = Field(nullable=True, gt=0)
-    datetime: Series[datetime]
-    run_type: Series[str] = Field(isin=[rt.value for rt in RunType])
 
 
-class GlucoseStreamsSchema(DataFrameModel):
+class GlucoseStreamsSchema(StreamsSchema):
     value: Series[float] = Field(nullable=True, gt=0)
-    datetime: Series[datetime]
-    run_type: Series[str] = Field(isin=[rt.value for rt in RunType])
