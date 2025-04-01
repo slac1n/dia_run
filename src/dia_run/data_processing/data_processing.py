@@ -2,17 +2,17 @@ import json
 from datetime import datetime
 
 import polars as pl
-from pandera import check_types
 from pandera.typing.polars import DataFrame, LazyFrame
 
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.run_types import RunType
 from dia_run.data_models.schemas import (
-    AggregateInsulinOnBoard,
     AggregatedGlucoseSchema,
+    AggregateInsulinOnBoard,
     BaseGlucoseStreamSchema,
     GlucoseStreamsSchema,
     HeartrateStreamsSchema,
+    PreRunInsulinSchema,
     SpecificCarelinkSchema,
     StravaSummarySchema,
     SummarySchema,
@@ -163,7 +163,7 @@ class DataProcessor:
             .agg(pl.sum("insulin_on_board_in_going"))
         )
 
-    def _load_pre_run_insulin_data(self, lf_right: pl.LazyFrame) -> pl.LazyFrame:
+    def _load_pre_run_insulin_data(self, lf_right: LazyFrame[StravaSummarySchema]) -> LazyFrame[PreRunInsulinSchema]:
         return (
             pl.scan_delta(str(self.data_paths.carelink))
             .filter(pl.col("type").is_in(["AUTO_BASAL_DELIVERY", "INSULIN"]))

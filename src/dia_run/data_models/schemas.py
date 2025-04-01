@@ -72,3 +72,10 @@ class AggregatedGlucoseSchema(DataFrameModel):
 class AggregateInsulinOnBoard(DataFrameModel):
     activity_id: Series[int] = Field(unique=True)
     insulin_on_board_in_going: Series[float] = Field(ge=0)
+
+
+class PreRunInsulinSchema(DataFrameModel):
+    activity_id: Series[int] = Field(unique=True)
+    datetime: Series[datetime]
+    start_date_local: Series[datetime]
+    value: Series[float] = Field(ge=0)
