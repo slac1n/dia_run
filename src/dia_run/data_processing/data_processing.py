@@ -8,6 +8,7 @@ from pandera.typing.polars import DataFrame, LazyFrame
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.run_types import RunType
 from dia_run.data_models.schemas import (
+    AggregateInsulinOnBoard,
     AggregatedGlucoseSchema,
     BaseGlucoseStreamSchema,
     GlucoseStreamsSchema,
@@ -140,7 +141,9 @@ class DataProcessor:
             .drop(["start_date_local", "end_date_local"])
         )
 
-    def _aggregate_insulin_on_board(self, lf_right: pl.LazyFrame) -> pl.LazyFrame:
+    def _aggregate_insulin_on_board(
+        self, lf_right: LazyFrame[StravaSummarySchema]
+    ) -> LazyFrame[AggregateInsulinOnBoard]:
         expression = (
             (
                 pl.col("value")

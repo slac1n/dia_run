@@ -67,3 +67,8 @@ class AggregatedGlucoseSchema(DataFrameModel):
     avg_sg: Series[float] = Field(nullable=True, gt=0)
     in_going_sg: Series[float] = Field(nullable=True, gt=0)
     out_going_sg: Series[float] = Field(nullable=True, gt=0)
+
+
+class AggregateInsulinOnBoard(DataFrameModel):
+    activity_id: Series[int] = Field(unique=True)
+    insulin_on_board_in_going: Series[float] = Field(ge=0)
