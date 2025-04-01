@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from typing import TypeVar
 
 import polars as pl
 from pandera.typing.polars import DataFrame, LazyFrame
@@ -18,6 +19,9 @@ from dia_run.data_models.schemas import (
     SummarySchema,
 )
 
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
 PRE_RUN_INSULIN_MINUTES = 180
 
 
@@ -180,7 +184,7 @@ class DataProcessor:
             .drop("end_date_local")
         )
 
-    def _join_data(self, *, lf_left: pl.LazyFrame, lf_right: pl.LazyFrame) -> pl.LazyFrame:
+    def _join_data(self, *, lf_left: LazyFrame[T], lf_right: LazyFrame[U]) -> LazyFrame[V]:
         return lf_left.join(
             lf_right,
             on="activity_id",
