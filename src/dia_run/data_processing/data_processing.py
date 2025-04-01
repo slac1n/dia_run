@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import TypeVar
 
 import polars as pl
+from pandera import check_types
 from pandera.typing.polars import DataFrame, LazyFrame
 
 from dia_run.data_models.paths import DataPaths
@@ -30,6 +31,7 @@ class DataProcessor:
         self.data_paths = data_paths or DataPaths()
         self.df_summary: pl.DataFrame | None = None
 
+    @check_types
     def get_summary(self) -> DataFrame[SummarySchema]:
         if self.df_summary is None:
             lf_summary = self._load_summary_data()
@@ -41,6 +43,7 @@ class DataProcessor:
 
         return self.df_summary
 
+    @check_types
     def get_specific_carelink(
         self, *, activity_id: int, start_datetime: datetime, end_datetime: datetime
     ) -> DataFrame[SpecificCarelinkSchema]:
@@ -66,6 +69,7 @@ class DataProcessor:
         with open(self.data_paths.questionnaire / f"{activity_id}.json") as f:
             return json.load(f)
 
+    @check_types
     def get_heartrate_streams(self) -> DataFrame[HeartrateStreamsSchema]:
         lf_summary = self._load_summary_data()
         return (
@@ -75,6 +79,7 @@ class DataProcessor:
             .select(pl.exclude("activity_id"))
         ).collect()
 
+    @check_types
     def get_glucose_streams(self) -> DataFrame[GlucoseStreamsSchema]:
         lf_summary = self._load_summary_data()
         return self._load_glucose_data(lf_summary).drop("activity_id").collect()
