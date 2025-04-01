@@ -58,6 +58,10 @@ class GlucoseStreamsSchema(StreamsSchema):
     value: Series[float] = Field(nullable=True, gt=0)
 
 
+class BaseGlucoseStreamSchema(GlucoseStreamsSchema):
+    activity_id: Series[int] = Field(unique=True)
+
+
 class AggregatedGlucoseSchema(DataFrameModel):
     activity_id: Series[int] = Field(unique=True)
     avg_sg: Series[float] = Field(nullable=True, gt=0)
