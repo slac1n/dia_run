@@ -157,7 +157,7 @@ class DataProcessor:
             .alias("insulin_on_board_in_going")
         )
         return (
-            self._load_pre_run_insulin_data(lf_right.select("activity_id", "start_date_local", "end_date_local"))
+            self._load_pre_run_insulin_data(lf_right)
             .with_columns(expression)
             .group_by("activity_id")
             .agg(pl.sum("insulin_on_board_in_going"))
@@ -169,7 +169,7 @@ class DataProcessor:
             .filter(pl.col("type").is_in(["AUTO_BASAL_DELIVERY", "INSULIN"]))
             .select(["value", "activity_id", "datetime"])
             .join(
-                lf_right,
+                lf_right.select("activity_id", "start_date_local", "end_date_local"),
                 on="activity_id",
                 how="inner",
             )
@@ -177,6 +177,7 @@ class DataProcessor:
                 (pl.col("datetime") >= pl.col("start_date_local") - pl.duration(minutes=PRE_RUN_INSULIN_MINUTES))
                 & (pl.col("datetime") <= pl.col("start_date_local") + pl.duration(minutes=5))
             )
+            .drop("end_date_local")
         )
 
     def _join_data(self, *, lf_left: pl.LazyFrame, lf_right: pl.LazyFrame) -> pl.LazyFrame:
