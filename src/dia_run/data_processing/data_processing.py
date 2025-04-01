@@ -9,6 +9,7 @@ from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.run_types import RunType
 from dia_run.data_models.schemas import (
     AggregatedGlucoseSchema,
+    BaseGlucoseStreamSchema,
     GlucoseStreamsSchema,
     HeartrateStreamsSchema,
     SpecificCarelinkSchema,
@@ -71,11 +72,7 @@ class DataProcessor:
 
     def get_glucose_streams(self) -> DataFrame[GlucoseStreamsSchema]:
         lf_summary = self._load_summary_data()
-        return (
-            self._load_glucose_data(lf_summary.select("activity_id", "start_date_local", "end_date_local", "run_type"))
-            .select(pl.exclude(["activity_id", "start_date_local", "end_date_local"]))
-            .collect()
-        )
+        return self._load_glucose_data(lf_summary).drop("activity_id").collect()
 
     def _load_summary_data(self) -> LazyFrame[StravaSummarySchema]:
         return pl.scan_delta(str(self.data_paths.strava_summary)).with_columns(
@@ -114,7 +111,7 @@ class DataProcessor:
 
     def _aggregate_glucose(self, lf_right: LazyFrame[StravaSummarySchema]) -> LazyFrame[AggregatedGlucoseSchema]:
         return (
-            self._load_glucose_data(lf_right.select("activity_id", "start_date_local", "end_date_local"))
+            self._load_glucose_data(lf_right)
             .group_by("activity_id")
             .agg(
                 [
@@ -125,13 +122,13 @@ class DataProcessor:
             )
         )
 
-    def _load_glucose_data(self, lf_right: pl.LazyFrame) -> pl.LazyFrame:
+    def _load_glucose_data(self, lf_right: LazyFrame[StravaSummarySchema]) -> LazyFrame[BaseGlucoseStreamSchema]:
         return (
             pl.scan_delta(str(self.data_paths.carelink))
             .filter(pl.col("type") == "CGM")
             .select(["value", "activity_id", "datetime"])
             .join(
-                lf_right,
+                lf_right.select("activity_id", "start_date_local", "end_date_local", "run_type"),
                 on="activity_id",
                 how="inner",
             )
@@ -140,6 +137,7 @@ class DataProcessor:
                 & (pl.col("datetime") <= pl.col("end_date_local") + pl.duration(minutes=5))
             )
             .with_columns(pl.col("value").replace(0.0, None))
+            .drop(["start_date_local", "end_date_local"])
         )
 
     def _aggregate_insulin_on_board(self, lf_right: pl.LazyFrame) -> pl.LazyFrame:
