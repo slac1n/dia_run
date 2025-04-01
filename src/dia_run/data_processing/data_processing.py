@@ -2,7 +2,8 @@ import json
 from datetime import datetime
 
 import polars as pl
-from pandera.typing.polars import DataFrame
+from pandera import check_types
+from pandera.typing.polars import DataFrame, LazyFrame
 
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.run_types import RunType
@@ -10,6 +11,7 @@ from dia_run.data_models.schemas import (
     GlucoseStreamsSchema,
     HeartrateStreamsSchema,
     SpecificCarelinkSchema,
+    StravaSummarySchema,
     SummarySchema,
 )
 
@@ -74,7 +76,7 @@ class DataProcessor:
             .collect()
         )
 
-    def _load_summary_data(self) -> pl.LazyFrame:
+    def _load_summary_data(self) -> LazyFrame[StravaSummarySchema]:
         return pl.scan_delta(str(self.data_paths.strava_summary)).with_columns(
             pl.format(
                 "{}:{}",
