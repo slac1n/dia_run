@@ -172,7 +172,7 @@ class RunFuelQuestionnaire:
         )
 
         with open(output_file, "w") as f:
-            json.dump(questionnaire_data.model_dump(mode="json"), f, indent=4)
+            json.dump(questionnaire_data.model_dump(mode="json"), f, indent=2)
 
         logger.info(f"Questionnaire saved to {output_file}")
 
