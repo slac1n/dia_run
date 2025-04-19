@@ -58,21 +58,21 @@ class TestDataProcessor:
         processor = DataProcessor(test_data_paths)
 
         activity_id_1 = 1001
-        result_1 = QuestionnaireModel.model_validate(processor.get_questionnaire(activity_id_1))
+        result_1 = processor.get_questionnaire(activity_id_1)
         assert len(result_1.pre_run) == 0
         assert len(result_1.basal_adjustments) == 0
         assert len(result_1.fueling_during_run) == 0
         assert len(result_1.bolus) == 0
 
         activity_id_2 = 1002
-        result_2 = QuestionnaireModel.model_validate(processor.get_questionnaire(activity_id_2))
+        result_2 = processor.get_questionnaire(activity_id_2)
         assert len(result_2.pre_run) == 1
         assert len(result_2.basal_adjustments) == 2
         assert len(result_2.fueling_during_run) == 1
         assert len(result_2.bolus) == 1
 
         activity_id_3 = 1003
-        result_3 = QuestionnaireModel.model_validate(processor.get_questionnaire(activity_id_3))
+        result_3 = processor.get_questionnaire(activity_id_3)
         assert len(result_3.pre_run) == 1
         assert len(result_3.basal_adjustments) == 0
         assert len(result_3.fueling_during_run) == 2
