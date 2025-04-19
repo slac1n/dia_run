@@ -1,11 +1,29 @@
 import json
 from datetime import datetime
+from typing import TypeVar
 
 import polars as pl
+from pandera import check_types
+from pandera.typing.polars import DataFrame, LazyFrame
 
 from dia_run.data_models.paths import DataPaths
+from dia_run.data_models.questionnaire import QuestionnaireModel
 from dia_run.data_models.run_types import RunType
+from dia_run.data_models.schemas import (
+    AggregatedGlucoseSchema,
+    AggregateInsulinOnBoard,
+    BaseGlucoseStreamSchema,
+    GlucoseStreamsSchema,
+    HeartrateStreamsSchema,
+    PreRunInsulinSchema,
+    SpecificCarelinkSchema,
+    StravaSummarySchema,
+    SummarySchema,
+)
 
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
 PRE_RUN_INSULIN_MINUTES = 180
 
 
@@ -14,7 +32,8 @@ class DataProcessor:
         self.data_paths = data_paths or DataPaths()
         self.df_summary: pl.DataFrame | None = None
 
-    def get_summary(self) -> pl.DataFrame:
+    @check_types
+    def get_summary(self) -> DataFrame[SummarySchema]:
         if self.df_summary is None:
             lf_summary = self._load_summary_data()
             lf_agg_glucose = self._aggregate_glucose(lf_summary)
@@ -25,9 +44,10 @@ class DataProcessor:
 
         return self.df_summary
 
+    @check_types
     def get_specific_carelink(
         self, *, activity_id: int, start_datetime: datetime, end_datetime: datetime
-    ) -> pl.DataFrame:
+    ) -> DataFrame[SpecificCarelinkSchema]:
         return (
             pl.scan_delta(str(self.data_paths.carelink))
             .filter(
@@ -46,11 +66,13 @@ class DataProcessor:
             .collect()
         )
 
-    def get_questionnaire(self, activity_id: int) -> dict:
+    def get_questionnaire(self, activity_id: int) -> QuestionnaireModel:
         with open(self.data_paths.questionnaire / f"{activity_id}.json") as f:
-            return json.load(f)
+            data = json.load(f)
+        return QuestionnaireModel.model_validate(data)
 
-    def get_heartrate_streams(self) -> pl.DataFrame:
+    @check_types
+    def get_heartrate_streams(self) -> DataFrame[HeartrateStreamsSchema]:
         lf_summary = self._load_summary_data()
         return (
             pl.scan_delta(str(self.data_paths.strava_stream))
@@ -59,15 +81,12 @@ class DataProcessor:
             .select(pl.exclude("activity_id"))
         ).collect()
 
-    def get_glucose_streams(self) -> pl.DataFrame:
+    @check_types
+    def get_glucose_streams(self) -> DataFrame[GlucoseStreamsSchema]:
         lf_summary = self._load_summary_data()
-        return (
-            self._load_glucose_data(lf_summary.select("activity_id", "start_date_local", "end_date_local", "run_type"))
-            .select(pl.exclude(["activity_id", "start_date_local", "end_date_local"]))
-            .collect()
-        )
+        return self._load_glucose_data(lf_summary).drop("activity_id").collect()
 
-    def _load_summary_data(self) -> pl.LazyFrame:
+    def _load_summary_data(self) -> LazyFrame[StravaSummarySchema]:
         return pl.scan_delta(str(self.data_paths.strava_summary)).with_columns(
             pl.format(
                 "{}:{}",
@@ -102,9 +121,9 @@ class DataProcessor:
             .alias("run_type"),
         )
 
-    def _aggregate_glucose(self, lf_right: pl.LazyFrame) -> pl.LazyFrame:
+    def _aggregate_glucose(self, lf_right: LazyFrame[StravaSummarySchema]) -> LazyFrame[AggregatedGlucoseSchema]:
         return (
-            self._load_glucose_data(lf_right.select("activity_id", "start_date_local", "end_date_local"))
+            self._load_glucose_data(lf_right)
             .group_by("activity_id")
             .agg(
                 [
@@ -115,13 +134,13 @@ class DataProcessor:
             )
         )
 
-    def _load_glucose_data(self, lf_right: pl.LazyFrame) -> pl.LazyFrame:
+    def _load_glucose_data(self, lf_right: LazyFrame[StravaSummarySchema]) -> LazyFrame[BaseGlucoseStreamSchema]:
         return (
             pl.scan_delta(str(self.data_paths.carelink))
             .filter(pl.col("type") == "CGM")
             .select(["value", "activity_id", "datetime"])
             .join(
-                lf_right,
+                lf_right.select("activity_id", "start_date_local", "end_date_local", "run_type"),
                 on="activity_id",
                 how="inner",
             )
@@ -130,9 +149,12 @@ class DataProcessor:
                 & (pl.col("datetime") <= pl.col("end_date_local") + pl.duration(minutes=5))
             )
             .with_columns(pl.col("value").replace(0.0, None))
+            .drop(["start_date_local", "end_date_local"])
         )
 
-    def _aggregate_insulin_on_board(self, lf_right: pl.LazyFrame) -> pl.LazyFrame:
+    def _aggregate_insulin_on_board(
+        self, lf_right: LazyFrame[StravaSummarySchema]
+    ) -> LazyFrame[AggregateInsulinOnBoard]:
         expression = (
             (
                 pl.col("value")
@@ -146,19 +168,19 @@ class DataProcessor:
             .alias("insulin_on_board_in_going")
         )
         return (
-            self._load_pre_run_insulin_data(lf_right.select("activity_id", "start_date_local", "end_date_local"))
+            self._load_pre_run_insulin_data(lf_right)
             .with_columns(expression)
             .group_by("activity_id")
             .agg(pl.sum("insulin_on_board_in_going"))
         )
 
-    def _load_pre_run_insulin_data(self, lf_right: pl.LazyFrame) -> pl.LazyFrame:
+    def _load_pre_run_insulin_data(self, lf_right: LazyFrame[StravaSummarySchema]) -> LazyFrame[PreRunInsulinSchema]:
         return (
             pl.scan_delta(str(self.data_paths.carelink))
             .filter(pl.col("type").is_in(["AUTO_BASAL_DELIVERY", "INSULIN"]))
             .select(["value", "activity_id", "datetime"])
             .join(
-                lf_right,
+                lf_right.select("activity_id", "start_date_local", "end_date_local"),
                 on="activity_id",
                 how="inner",
             )
@@ -166,9 +188,10 @@ class DataProcessor:
                 (pl.col("datetime") >= pl.col("start_date_local") - pl.duration(minutes=PRE_RUN_INSULIN_MINUTES))
                 & (pl.col("datetime") <= pl.col("start_date_local") + pl.duration(minutes=5))
             )
+            .drop("end_date_local")
         )
 
-    def _join_data(self, *, lf_left: pl.LazyFrame, lf_right: pl.LazyFrame) -> pl.LazyFrame:
+    def _join_data(self, *, lf_left: LazyFrame[T], lf_right: LazyFrame[U]) -> LazyFrame[V]:
         return lf_left.join(
             lf_right,
             on="activity_id",

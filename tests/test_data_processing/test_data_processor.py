@@ -5,6 +5,12 @@ import polars as pl
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.questionnaire import QuestionnaireModel
 from dia_run.data_models.run_types import RunType
+from dia_run.data_models.schemas import (
+    GlucoseStreamsSchema,
+    HeartrateStreamsSchema,
+    SpecificCarelinkSchema,
+    SummarySchema,
+)
 from dia_run.data_processing.data_processing import PRE_RUN_INSULIN_MINUTES, DataProcessor
 
 
@@ -13,7 +19,7 @@ class TestDataProcessor:
         processor = DataProcessor(test_data_paths)
         result = processor.get_summary()
 
-        assert isinstance(result, pl.DataFrame)
+        SummarySchema.validate(result)
         assert len(result) == 3
         assert set(result["activity_id"].to_list()) == {1001, 1002, 1003}
 
@@ -33,7 +39,7 @@ class TestDataProcessor:
         result = processor.get_specific_carelink(
             activity_id=activity_id, start_datetime=start_datetime, end_datetime=end_datetime
         )
-        assert isinstance(result, pl.DataFrame)
+        SpecificCarelinkSchema.validate(result)
         assert set(result["type"].to_list()) == {"INSULIN", "AUTO_BASAL_DELIVERY", "CGM"}
         assert result.filter(pl.col("type") == "INSULIN").height == 1
         assert result.filter(pl.col("type") == "AUTO_BASAL_DELIVERY").height == 35
@@ -52,21 +58,21 @@ class TestDataProcessor:
         processor = DataProcessor(test_data_paths)
 
         activity_id_1 = 1001
-        result_1 = QuestionnaireModel.model_validate(processor.get_questionnaire(activity_id_1))
+        result_1 = processor.get_questionnaire(activity_id_1)
         assert len(result_1.pre_run) == 0
         assert len(result_1.basal_adjustments) == 0
         assert len(result_1.fueling_during_run) == 0
         assert len(result_1.bolus) == 0
 
         activity_id_2 = 1002
-        result_2 = QuestionnaireModel.model_validate(processor.get_questionnaire(activity_id_2))
+        result_2 = processor.get_questionnaire(activity_id_2)
         assert len(result_2.pre_run) == 1
         assert len(result_2.basal_adjustments) == 2
         assert len(result_2.fueling_during_run) == 1
         assert len(result_2.bolus) == 1
 
         activity_id_3 = 1003
-        result_3 = QuestionnaireModel.model_validate(processor.get_questionnaire(activity_id_3))
+        result_3 = processor.get_questionnaire(activity_id_3)
         assert len(result_3.pre_run) == 1
         assert len(result_3.basal_adjustments) == 0
         assert len(result_3.fueling_during_run) == 2
@@ -76,7 +82,7 @@ class TestDataProcessor:
         processor = DataProcessor(test_data_paths)
         result = processor.get_heartrate_streams()
 
-        assert isinstance(result, pl.DataFrame)
+        HeartrateStreamsSchema.validate(result)
         assert set(result["run_type"].to_list()) == {RunType.EASY, RunType.INTERVAL, RunType.LONG}
 
         easy_hrs = result.filter(pl.col("run_type") == RunType.EASY)["heartrate"]
@@ -97,7 +103,7 @@ class TestDataProcessor:
         processor = DataProcessor(test_data_paths)
         result = processor.get_glucose_streams()
 
-        assert isinstance(result, pl.DataFrame)
+        GlucoseStreamsSchema.validate(result)
         assert set(result["run_type"].to_list()) == {RunType.EASY, RunType.INTERVAL, RunType.LONG}
 
         easy_gs = result.filter(pl.col("run_type") == RunType.EASY)["value"]
