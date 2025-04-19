@@ -181,35 +181,39 @@ def questionnaire_data() -> dict[int, dict]:
             "bolus": [],
         },
         1002: {
-            "pre_run": {
-                "carbohydrates_g": "30",
-                "time_before_start_min": "-30",
-                "food_type": "Energy Bar",
-                "bolus_percentage": "70",
-            },
+            "pre_run": [
+                {
+                    "carbohydrates_g": 30,
+                    "time_before_start_min": -30,
+                    "food_type": "Energy Bar",
+                    "bolus_percentage": 70.0,
+                }
+            ],
             "basal_adjustments": [
-                {"type": "Temporal SmartGuard", "start_time_min": "-10", "end_time_min": "60"},
+                {"type": "Temporal SmartGuard", "start_time_min": -10, "end_time_min": 60},
                 {
                     "type": "Temporal Basalrate",
-                    "start_time_min": "60",
-                    "end_time_min": "120",
-                    "basal_rate_percentage": "20",
+                    "start_time_min": 60,
+                    "end_time_min": 120,
+                    "basal_rate_percentage": 20.0,
                 },
             ],
-            "fueling_during_run": [{"carbohydrates_g": "15", "time_during_run_min": "15", "food_type": "Energy Gel"}],
-            "bolus": {"time_of_bolus_min": "20", "bolus_units": "0.5"},
+            "fueling_during_run": [{"carbohydrates_g": 15, "time_during_run_min": 15, "food_type": "Energy Gel"}],
+            "bolus": [{"time_of_bolus_min": 20, "bolus_units": 0.5}],
         },
         1003: {
-            "pre_run": {
-                "carbohydrates_g": "40",
-                "time_before_start_min": "-60",
-                "food_type": "Oatmeal",
-                "bolus_percentage": "80",
-            },
+            "pre_run": [
+                {
+                    "carbohydrates_g": 40,
+                    "time_before_start_min": -60,
+                    "food_type": "Oatmeal",
+                    "bolus_percentage": 80.0,
+                }
+            ],
             "basal_adjustments": [],
             "fueling_during_run": [
-                {"carbohydrates_g": "20", "time_during_run_min": "15", "food_type": "Energy Gel"},
-                {"carbohydrates_g": "25", "time_during_run_min": "30", "food_type": "Sports Drink"},
+                {"carbohydrates_g": 20, "time_during_run_min": 15, "food_type": "Energy Gel"},
+                {"carbohydrates_g": 25, "time_during_run_min": 30, "food_type": "Sports Drink"},
             ],
             "bolus": [],
         },

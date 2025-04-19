@@ -67,13 +67,14 @@ with tab1:
         with left_column:
             st.subheader("Pre-Run Nutrition :pizza:", divider="orange")
             if questionnaire["pre_run"]:
-                st.markdown(
-                    f"""
-                    - **Amount of carbohydrates:** :orange[{questionnaire["pre_run"]["carbohydrates_g"]}g]
-                    - **Type of food:** :orange[{questionnaire["pre_run"]["food_type"]}]
-                    - **Bolusing percentage:** :orange[{questionnaire["pre_run"]["bolus_percentage"]}%]
-                    """
-                )
+                for pre_run in questionnaire["pre_run"]:
+                    st.markdown(
+                        f"""
+                        - **Amount of carbohydrates:** :orange[{pre_run["carbohydrates_g"]}g]
+                        - **Type of food:** :orange[{pre_run["food_type"]}]
+                        - **Bolusing percentage:** :orange[{pre_run["bolus_percentage"]}%]
+                        """
+                    )
             else:
                 st.markdown("No pre-run nutrition")
 

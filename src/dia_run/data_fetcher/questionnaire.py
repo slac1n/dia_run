@@ -1,12 +1,12 @@
 import json
 from pathlib import Path
-from typing import Any
 
 import polars as pl
 import questionary
 from loguru import logger
 
 from dia_run.data_models.paths import DataPaths
+from dia_run.data_models.questionnaire import BasalAdjustment, BolusEntry, FuelingEntry, PreRunInfo, QuestionnaireModel
 
 
 class RunFuelQuestionnaire:
@@ -15,7 +15,10 @@ class RunFuelQuestionnaire:
         self.QUESTIONNAIRE_DIR: Path = data_paths.questionnaire
         self.QUESTIONNAIRE_DIR.mkdir(exist_ok=True)
         self.activity_id: int | None = None
-        self.responses: dict[str, Any] = {}
+        self.pre_run_info: list[PreRunInfo] = []
+        self.basal_adjustments: list[BasalAdjustment] = []
+        self.fueling_during_run: list[FuelingEntry] = []
+        self.bolus: list[BolusEntry] = []
 
     def load_filtered_activities(self) -> pl.DataFrame:
         # Read the delta table
@@ -63,7 +66,6 @@ class RunFuelQuestionnaire:
         did_fuel = questionary.confirm("Did you take any carbohydrates before the run?").ask()
 
         if not did_fuel:
-            self.responses["pre_run"] = []
             return
 
         carbs = questionary.text("How many grams of carbohydrates did you take pre-run?").ask()
@@ -73,15 +75,16 @@ class RunFuelQuestionnaire:
         bolus_percentage = questionary.text("What percentage of bolus did you take?").ask()
         food_type = questionary.text("What kind of food was it?").ask()
 
-        self.responses["pre_run"] = {
-            "carbohydrates_g": carbs,
-            "time_before_start_min": time_before_start,
-            "bolus_percentage": bolus_percentage,
-            "food_type": food_type,
-        }
+        self.pre_run_info.append(
+            PreRunInfo(
+                carbohydrates_g=int(carbs),
+                time_before_start_min=int(time_before_start),
+                bolus_percentage=float(bolus_percentage),
+                food_type=food_type,
+            )
+        )
 
     def ask_bolus(self) -> None:
-        bolus_entries = []
         while True:
             did_bolus = questionary.confirm("Did you administer a manual bolus?").ask()
 
@@ -93,17 +96,14 @@ class RunFuelQuestionnaire:
             ).ask()
             bolus_units = questionary.text("How many units of bolus did you administer?").ask()
 
-            bolus_entries.append(
-                {
-                    "time_of_bolus_min": time_of_bolus,
-                    "bolus_units": bolus_units,
-                }
+            self.bolus.append(
+                BolusEntry(
+                    time_of_bolus_min=int(time_of_bolus),
+                    bolus_units=float(bolus_units),
+                )
             )
 
-        self.responses["bolus"] = bolus_entries
-
     def ask_basal_adjustments(self) -> None:
-        adjustments = []
         while True:
             adjustment_type = questionary.select(
                 "Did you adjust your basal rates?",
@@ -118,52 +118,61 @@ class RunFuelQuestionnaire:
             if adjustment_type == "No [More] Adjustments":
                 break
 
-            adjustment = {"type": adjustment_type}
-            adjustment["start_time_min"] = questionary.text(
-                f"When did you start {adjustment_type}? (minutes from start, negative for before)"
-            ).ask()
-            adjustment["end_time_min"] = questionary.text(
-                f"When did you end {adjustment_type}? (minutes from start, negative for before)"
-            ).ask()
-
-            if adjustment_type == "Temporal Basalrate":
-                adjustment["basal_rate_percentage"] = questionary.text(
-                    "What was the set basal rate in percentage?"
+            start_time_min = int(
+                questionary.text(
+                    f"When did you start {adjustment_type}? (minutes from start, negative for before)"
                 ).ask()
+            )
+            end_time_min = int(
+                questionary.text(f"When did you end {adjustment_type}? (minutes from start, negative for before)").ask()
+            )
 
-            adjustments.append(adjustment)
+            basal_rate_percentage = None
+            if adjustment_type == "Temporal Basalrate":
+                basal_rate_percentage = float(questionary.text("What was the set basal rate in percentage?").ask())
 
-        self.responses["basal_adjustments"] = adjustments
+            self.basal_adjustments.append(
+                BasalAdjustment(
+                    type=adjustment_type,
+                    start_time_min=start_time_min,
+                    end_time_min=end_time_min,
+                    basal_rate_percentage=basal_rate_percentage,
+                )
+            )
 
     def ask_fueling_during_run(self) -> None:
-        fueling = []
         while True:
             took_fuel = questionary.confirm("Did you take carbohydrates during the run?").ask()
 
             if not took_fuel:
                 break
 
-            carb_amount = questionary.text("How many grams of carbohydrates did you take?").ask()
-            time_during_run = questionary.text(
-                "When during the run did you take it? (minutes from start, negative for before)"
-            ).ask()
+            carb_amount = int(questionary.text("How many grams of carbohydrates did you take?").ask())
+            time_during_run = int(
+                questionary.text("When during the run did you take it? (minutes from start, negative for before)").ask()
+            )
             food_type = questionary.text("What kind of food was it?").ask()
 
-            fueling.append(
-                {
-                    "carbohydrates_g": carb_amount,
-                    "time_during_run_min": time_during_run,
-                    "food_type": food_type,
-                }
+            self.fueling_during_run.append(
+                FuelingEntry(
+                    carbohydrates_g=carb_amount,
+                    time_during_run_min=time_during_run,
+                    food_type=food_type,
+                )
             )
-
-        self.responses["fueling_during_run"] = fueling
 
     def save_to_json(self) -> None:
         output_file = self.QUESTIONNAIRE_DIR / f"{self.activity_id}.json"
 
+        questionnaire_data = QuestionnaireModel(
+            pre_run=self.pre_run_info,
+            basal_adjustments=self.basal_adjustments,
+            fueling_during_run=self.fueling_during_run,
+            bolus=self.bolus,
+        )
+
         with open(output_file, "w") as f:
-            json.dump(self.responses, f, indent=4)
+            json.dump(questionnaire_data.model_dump(mode="json"), f, indent=2)
 
         logger.info(f"Questionnaire saved to {output_file}")
 

@@ -78,12 +78,8 @@ def create_single_activity_carelink_chart(*, data_processor: DataProcessor, acti
     )
 
     if questionnaire["pre_run"]:
-        prerun_time_diff = int(questionnaire["pre_run"]["time_before_start_min"])
-
-        if prerun_time_diff < 0:
-            # make time absolute
-            prerun_time_diff = abs(prerun_time_diff)
-            prerun_time = start_datetime - timedelta(minutes=prerun_time_diff)
+        for prerun in questionnaire["pre_run"]:
+            prerun_time = start_datetime + timedelta(minutes=prerun["time_before_start_min"])
             _add_vertical_line(fig=fig, datetime_instance=prerun_time, color="orange", name="Pre-Run Nutrition")
 
     if questionnaire["fueling_during_run"]:
