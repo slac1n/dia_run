@@ -1,3 +1,9 @@
+## v0.6.0 (2025-04-19)
+
+### Feat
+
+- **TG-9**: Implement proper data validation for data processing (#15)
+
 ## v0.5.3 (2025-03-31)
 
 ### Fix
