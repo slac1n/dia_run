@@ -7,6 +7,7 @@ from pandera import check_types
 from pandera.typing.polars import DataFrame, LazyFrame
 
 from dia_run.data_models.paths import DataPaths
+from dia_run.data_models.questionnaire import QuestionnaireModel
 from dia_run.data_models.run_types import RunType
 from dia_run.data_models.schemas import (
     AggregatedGlucoseSchema,
@@ -65,9 +66,10 @@ class DataProcessor:
             .collect()
         )
 
-    def get_questionnaire(self, activity_id: int) -> dict:
+    def get_questionnaire(self, activity_id: int) -> QuestionnaireModel:
         with open(self.data_paths.questionnaire / f"{activity_id}.json") as f:
-            return json.load(f)
+            data = json.load(f)
+        return QuestionnaireModel.model_validate(data)
 
     @check_types
     def get_heartrate_streams(self) -> DataFrame[HeartrateStreamsSchema]:
