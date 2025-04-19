@@ -66,13 +66,13 @@ with tab1:
         left_column, right_column = st.columns(2)
         with left_column:
             st.subheader("Pre-Run Nutrition :pizza:", divider="orange")
-            if questionnaire["pre_run"]:
-                for pre_run in questionnaire["pre_run"]:
+            if questionnaire.pre_run:
+                for pre_run in questionnaire.pre_run:
                     st.markdown(
                         f"""
-                        - **Amount of carbohydrates:** :orange[{pre_run["carbohydrates_g"]}g]
-                        - **Type of food:** :orange[{pre_run["food_type"]}]
-                        - **Bolusing percentage:** :orange[{pre_run["bolus_percentage"]}%]
+                        - **Amount of carbohydrates:** :orange[{pre_run.carbohydrates_g}g]
+                        - **Type of food:** :orange[{pre_run.food_type}]
+                        - **Bolusing percentage:** :orange[{pre_run.bolus_percentage}%]
                         """
                     )
             else:
@@ -80,13 +80,13 @@ with tab1:
 
         with right_column:
             st.subheader("Fueling During Run :banana:", divider="blue")
-            if questionnaire["fueling_during_run"]:
-                for counter, fuel in enumerate(questionnaire["fueling_during_run"]):
+            if questionnaire.fueling_during_run:
+                for counter, fuel in enumerate(questionnaire.fueling_during_run):
                     st.markdown(
                         f"""
                         ##### Fueling Instance: {counter + 1}
-                        - **Amount of carbohydrates:** :blue[{fuel["carbohydrates_g"]}g]
-                        - **Type of food:** :blue[{fuel["food_type"]}]
+                        - **Amount of carbohydrates:** :blue[{fuel.carbohydrates_g}g]
+                        - **Type of food:** :blue[{fuel.food_type}]
                         """
                     )
             else:

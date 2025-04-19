@@ -77,14 +77,14 @@ def create_single_activity_carelink_chart(*, data_processor: DataProcessor, acti
         line_width=0,
     )
 
-    if questionnaire["pre_run"]:
-        for prerun in questionnaire["pre_run"]:
-            prerun_time = start_datetime + timedelta(minutes=prerun["time_before_start_min"])
+    if questionnaire.pre_run:
+        for prerun in questionnaire.pre_run:
+            prerun_time = start_datetime + timedelta(minutes=prerun.time_before_start_min)
             _add_vertical_line(fig=fig, datetime_instance=prerun_time, color="orange", name="Pre-Run Nutrition")
 
-    if questionnaire["fueling_during_run"]:
-        for fuel_instance, fuel in enumerate(questionnaire["fueling_during_run"]):
-            fuel_time_diff = int(fuel["time_during_run_min"])
+    if questionnaire.fueling_during_run:
+        for fuel_instance, fuel in enumerate(questionnaire.fueling_during_run):
+            fuel_time_diff = fuel.time_during_run_min
             fuel_time = start_datetime + timedelta(minutes=fuel_time_diff)
             _add_vertical_line(
                 fig=fig, datetime_instance=fuel_time, color="blue", name=f"Fueling {int(fuel_instance) + 1}"
