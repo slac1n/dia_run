@@ -1,3 +1,9 @@
+## v0.6.1 (2025-06-18)
+
+### Fix
+
+- make insulin_on_board_in_going nullable (#16)
+
 ## v0.6.0 (2025-04-19)
 
 ### Feat
