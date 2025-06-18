@@ -36,7 +36,7 @@ class SummarySchema(StravaSummarySchema):
     in_going_sg: Series[float] = Field(nullable=True, gt=0)
     out_going_sg: Series[float] = Field(nullable=True, gt=0)
     avg_sg: Series[float] = Field(nullable=True, gt=0)
-    insulin_on_board_in_going: Series[float] = Field(ge=0)
+    insulin_on_board_in_going: Series[float] = Field(nullable=True, ge=0)
 
 
 class SpecificCarelinkSchema(DataFrameModel):
