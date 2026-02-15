@@ -16,8 +16,9 @@
 #    28/12/2023 - Initial version
 #    11/04/2024 - Check for valid data in API response in _get_data()
 #    19/11/2024 - Update CARELINK_CONFIG_URL
+#    11/02/2025 - Update CARELINK_CONFIG_URL to ver 3.3
 #
-#  Copyright 2023-2024, Ondrej Wisniewski
+#  Copyright 2023-2025, Ondrej Wisniewski
 #
 # Copied from https://github.com/ondrej1024/carelink-python-client/tree/main
 ###############################################################################
@@ -29,7 +30,7 @@
 # carelink_carepartner_api_login.py
 #
 # [0.2] GET base_urls (region=US or region=EU) and sso_config urls
-# GET https://clcloud.minimed.eu/connect/carepartner/v6/discover/android/3.1
+# GET https://clcloud.minimed.eu/connect/carepartner/v11/discover/android/3.3
 #
 # [1] GET role from "baseUrlCareLink"
 # GET /api/carepartner/v2/users/me
@@ -38,10 +39,10 @@
 # GET /api/carepartner/v2/links/patients
 #
 # [3] GET data (providing username, role, patientId) from "baseUrlCumulus"
-# POST /connect/carepartner/v6/display/message
+# POST /connect/carepartner/v11/display/message
 #
 # [4] REFRESH access_token, refresh_token from
-# sso_config['server']['hostname']:sso_config['server']['port']/sso_config['server']['prefix']/sso_config["oauth"]["system_endpoints"]["token_endpoint_path"]
+# sso_config["server"]["hostname"]:sso_config["server"]["port"]/sso_config["server"]["prefix"]/sso_config["system_endpoints"]["token_endpoint_path"]
 # POST /auth/oauth/v2/token
 
 import json
@@ -54,13 +55,11 @@ from datetime import datetime, timedelta
 
 
 # Version string
-VERSION = "1.2"
+VERSION = "1.3"
 
 # Constants
 DEFAULT_FILENAME = "logindata.json"
-CARELINK_CONFIG_URL = (
-    "https://clcloud.minimed.com/connect/carepartner/v11/discover/android/3.2"
-)
+CARELINK_CONFIG_URL = "https://clcloud.minimed.eu/connect/carepartner/v11/discover/android/3.3"
 AUTH_ERROR_CODES = [401, 403]
 COMMON_HEADERS = {
     "Accept": "application/json",
@@ -117,10 +116,11 @@ class CareLinkClient(object):
                 required_fields = [
                     "access_token",
                     "refresh_token",
+                    "id_token",
                     "scope",
                     "client_id",
-                    "client_secret",
-                    "mag-identifier",
+                    # "client_secret",
+                    # "mag-identifier",
                 ]
                 for f in required_fields:
                     if f not in token_data:
@@ -163,18 +163,17 @@ class CareLinkClient(object):
                 config = c
                 break
         if config is None:
-            raise Exception(
-                "ERROR: failed to get config base urls for region %s" % region
-            )
+            raise Exception("ERROR: failed to get config base urls for region %s" % region)
 
         resp = requests.get(config["SSOConfiguration"])
         log.debug("   status: %d" % resp.status_code)
         sso_config = resp.json()
-        sso_base_url = f"https://{sso_config['server']['hostname']}:{sso_config['server']['port']}/{sso_config['server']['prefix']}"
-        token_url = (
-            sso_base_url
-            + sso_config["oauth"]["system_endpoints"]["token_endpoint_path"]
+        sso_base_url = "https://%s:%d/%s" % (
+            sso_config["server"]["hostname"],
+            sso_config["server"]["port"],
+            sso_config["server"]["prefix"],
         )
+        token_url = sso_base_url + sso_config["system_endpoints"]["token_endpoint_path"]
         c["token_url"] = token_url
         return config
 
@@ -185,7 +184,7 @@ class CareLinkClient(object):
         log.info("_get_user()")
         url = config["baseUrlCareLink"] + "/users/me"
         headers = COMMON_HEADERS
-        headers["mag-identifier"] = token_data["mag-identifier"]
+        # headers["mag-identifier"] = token_data["mag-identifier"]
         headers["Authorization"] = "Bearer " + token_data["access_token"]
         self.__last_api_status = None
         resp = requests.get(url=url, headers=headers)
@@ -204,7 +203,7 @@ class CareLinkClient(object):
         log.info("_get_patient()")
         url = config["baseUrlCareLink"] + "/links/patients"
         headers = COMMON_HEADERS
-        headers["mag-identifier"] = token_data["mag-identifier"]
+        # headers["mag-identifier"] = token_data["mag-identifier"]
         headers["Authorization"] = "Bearer " + token_data["access_token"]
         self.__last_api_status = None
         resp = requests.get(url=url, headers=headers)
@@ -223,7 +222,7 @@ class CareLinkClient(object):
         log.info("_get_data()")
         url = config["baseUrlCumulus"] + "/display/message"
         headers = COMMON_HEADERS
-        headers["mag-identifier"] = token_data["mag-identifier"]
+        # headers["mag-identifier"] = token_data["mag-identifier"]
         headers["Authorization"] = "Bearer " + token_data["access_token"]
         data = {}
         data["username"] = username
@@ -316,9 +315,7 @@ class CareLinkClient(object):
             return False
 
         # Token is valid
-        auth_token_validto = datetime.utcfromtimestamp(token_validto).strftime(
-            "%a %b %d %H:%M:%S UTC %Y"
-        )
+        auth_token_validto = datetime.utcfromtimestamp(token_validto).strftime("%a %b %d %H:%M:%S UTC %Y")
         log.info("   access token expires in %ds (%s)" % (tdiff, auth_token_validto))
         return True
 
@@ -335,9 +332,7 @@ class CareLinkClient(object):
         try:
             self.__country = self.__accessTokenPayload["token_details"]["country"]
             self.__config = self._get_config(CARELINK_CONFIG_URL, self.__country)
-            self.__username = self.__accessTokenPayload["token_details"][
-                "preferred_username"
-            ]
+            self.__username = self.__accessTokenPayload["token_details"]["preferred_username"]
             self.__user = self._get_user(self.__config, self.__tokenData)
             if self.__user["role"] in ["CARE_PARTNER", "CARE_PARTNER_OUS"]:
                 self.__patient = self._get_patient(self.__config, self.__tokenData)
@@ -346,9 +341,7 @@ class CareLinkClient(object):
             if self.__last_api_status in AUTH_ERROR_CODES:
                 try:
                     self.__tokenData = self._do_refresh(self.__config, self.__tokenData)
-                    self.__accessTokenPayload = self._get_access_token_payload(
-                        self.__tokenData
-                    )
+                    self.__accessTokenPayload = self._get_access_token_payload(self.__tokenData)
                     self._write_token_file(self.__tokenData, self.__tokenFile)
                 except Exception as e:
                     log.error(e)
@@ -377,20 +370,13 @@ class CareLinkClient(object):
     ###########################################################
     def printUserInfo(self):
         print("User Info:")
-        print(
-            "   user:     %s (%s %s)"
-            % (self.__username, self.__user["firstName"], self.__user["lastName"])
-        )
+        print("   user:     %s (%s %s)" % (self.__username, self.__user["firstName"], self.__user["lastName"]))
         print("   role:     %s" % self.__user["role"])
         print("   country:  %s" % self.__country)
         if self.__patient is not None:
             print(
                 "   patient:  %s (%s %s)"
-                % (
-                    self.__patient["username"],
-                    self.__patient["firstName"],
-                    self.__patient["lastName"],
-                )
+                % (self.__patient["username"], self.__patient["firstName"], self.__patient["lastName"])
             )
 
     ###########################################################
@@ -412,13 +398,7 @@ class CareLinkClient(object):
             patientId = None
 
         # Get data: first try
-        data = self._get_data(
-            self.__config,
-            self.__tokenData,
-            self.__username,
-            self.__user["role"],
-            patientId,
-        )
+        data = self._get_data(self.__config, self.__tokenData, self.__username, self.__user["role"], patientId)
         # Check API response
         if self.__last_api_status in AUTH_ERROR_CODES:
             # Try to refresh token
@@ -427,13 +407,7 @@ class CareLinkClient(object):
             self._write_token_file(self.__tokenData, self.__tokenFile)
 
             # Get data: second try
-            data = self._get_data(
-                self.__config,
-                self.__tokenData,
-                self.__username,
-                self.__user["role"],
-                patientId,
-            )
+            data = self._get_data(self.__config, self.__tokenData, self.__username, self.__user["role"], patientId)
             # Check API response
             if self.__last_api_status in AUTH_ERROR_CODES:
                 # Failed permanently

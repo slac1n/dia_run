@@ -21,6 +21,7 @@
 #  Changelog:
 #
 #    28/12/2023 - Initial version
+#    14/03/2025 - Updated discovery_url, based on https://github.com/ondrej1024/carelink-python-client/pull/23
 #    19/11/2024 - Update discovery_url
 #
 #
@@ -31,7 +32,6 @@
 #     - OpenSSL
 #     - seleniumwire
 #
-# Copied from https://github.com/ondrej1024/carelink-python-client/tree/main
 ###############################################################################
 import argparse
 import base64
@@ -63,9 +63,7 @@ def setup_logging():
 
 
 def random_b64_str(length):
-    random_chars = "".join(
-        random.choice(string.ascii_letters + string.digits) for _ in range(length + 10)
-    )
+    random_chars = "".join(random.choice(string.ascii_letters + string.digits) for _ in range(length + 10))
     base64_string = base64.b64encode(random_chars.encode("utf-8")).decode("utf-8")
     return base64_string[:length]
 
@@ -114,9 +112,7 @@ def reformat_csr(csr):
 
 def do_captcha(url, redirect_url):
     print("opening Firefox instance...")
-    print(
-        "Warning: you may need to close Firefox if it's already running or nothing happens!"
-    )
+    print("Warning: you may need to close Firefox if it's already running or nothing happens!")
     driver = webdriver.Firefox()
     driver.get(url)
 
@@ -127,8 +123,10 @@ def do_captcha(url, redirect_url):
                     if "location" in request.response.headers:
                         location = request.response.headers["location"]
                         if redirect_url in location:
-                            code = re.search(r"code=(.*)&", location).group(1)
-                            state = re.search(r"state=(.*)", location).group(1)
+                            code = re.search(r"code=(.*)", location).group(1)
+                            state = None
+                            if "state=" in location:
+                                state = re.search(r"state=(.*)", location).group(1)
                             driver.quit()
                             return (code, state)
         sleep(0.1)
@@ -138,18 +136,30 @@ def resolve_endpoint_config(discovery_url, is_us_region=False):
     discover_resp = json.loads(requests.get(discovery_url).text)
     sso_url = None
 
+    is_auth0 = False
+
     for c in discover_resp["CP"]:
         if c["region"].lower() == "us" and is_us_region:
-            sso_url = c["SSOConfiguration"]
+            key = c["UseSSOConfiguration"]
+            sso_url = c[key]
+            if "Auth0" in key:
+                is_auth0 = True
         elif c["region"].lower() == "eu" and not is_us_region:
-            sso_url = c["SSOConfiguration"]
+            key = c["UseSSOConfiguration"]
+            sso_url = c[key]
+            if "Auth0" in key:
+                is_auth0 = True
 
     if sso_url is None:
         raise Exception("Could not get SSO config url")
 
     sso_config = json.loads(requests.get(sso_url).text)
-    api_base_url = f"https://{sso_config['server']['hostname']}:{sso_config['server']['port']}/{sso_config['server']['prefix']}"
-    return sso_config, api_base_url
+    api_base_url = (
+        f"https://{sso_config['server']['hostname']}:{sso_config['server']['port']}/{sso_config['server']['prefix']}"
+    )
+    if api_base_url.endswith("/"):
+        api_base_url = api_base_url[:-1]
+    return sso_config, api_base_url, is_auth0
 
 
 def write_datafile(obj, filename):
@@ -158,34 +168,23 @@ def write_datafile(obj, filename):
         json.dump(obj, f, indent=4)
 
 
-def do_login(endpoint_config):
-    sso_config, api_base_url = endpoint_config
+def do_login_non_auth0(endpoint_config):
+    sso_config, api_base_url, is_auth0 = endpoint_config
+
     # step 1 initialize
-    data = {
-        "client_id": sso_config["oauth"]["client"]["client_ids"][0]["client_id"],
-        "nonce": random_uuid(),
-    }
+    data = {"client_id": sso_config["oauth"]["client"]["client_ids"][0]["client_id"], "nonce": random_uuid()}
     headers = {
-        "device-id": base64.b64encode(
-            random_device_id().encode()
-        ).decode()  # this is not used elsewhere?
+        "device-id": base64.b64encode(random_device_id().encode()).decode()  # this is not used elsewhere?
     }
-    client_init_url = (
-        api_base_url
-        + sso_config["mag"]["system_endpoints"]["client_credential_init_endpoint_path"]
-    )
+    client_init_url = api_base_url + sso_config["mag"]["system_endpoints"]["client_credential_init_endpoint_path"]
     client_init_req = requests.post(client_init_url, data=data, headers=headers)
     client_init_response = json.loads(client_init_req.text)
 
     # step 2 authorize
     client_code_verifier = base64.urlsafe_b64encode(os.urandom(40)).decode("utf-8")
     client_code_verifier = re.sub("[^a-zA-Z0-9]+", "", client_code_verifier)
-    client_code_challange = hashlib.sha256(
-        client_code_verifier.encode("utf-8")
-    ).digest()
-    client_code_challange = base64.urlsafe_b64encode(client_code_challange).decode(
-        "utf-8"
-    )
+    client_code_challange = hashlib.sha256(client_code_verifier.encode("utf-8")).digest()
+    client_code_challange = base64.urlsafe_b64encode(client_code_challange).decode("utf-8")
     client_code_challange = client_code_challange.replace("=", "")
 
     client_state = random_b64_str(22)  # whats this ?
@@ -199,13 +198,8 @@ def do_login(endpoint_config):
         "code_challenge_method": "S256",
         "state": client_state,
     }
-    authorize_url = (
-        api_base_url
-        + sso_config["oauth"]["system_endpoints"]["authorization_endpoint_path"]
-    )
-    providers = json.loads(
-        requests.get(authorize_url, params=auth_params).text
-    )  # this will redirect
+    authorize_url = api_base_url + sso_config["oauth"]["system_endpoints"]["authorization_endpoint_path"]
+    providers = json.loads(requests.get(authorize_url, params=auth_params).text)  # this will redirect
     captcha_url = providers["providers"][0]["provider"]["auth_url"]
 
     # step 3 captcha login and consent
@@ -217,9 +211,7 @@ def do_login(endpoint_config):
 
     # step 4 registraton
     register_device_id = random_device_id()
-    client_auth_str = (
-        f"{client_init_response['client_id']}:{client_init_response['client_secret']}"
-    )
+    client_auth_str = f"{client_init_response['client_id']}:{client_init_response['client_secret']}"
 
     android_model = random_android_model()
     android_model_safe = re.sub(r"[^a-zA-Z0-9]", "", android_model)
@@ -230,40 +222,28 @@ def do_login(endpoint_config):
     #       i = 2048;
     keypair.generate_key(OpenSSL.crypto.TYPE_RSA, rsa_keysize)
     csr = create_csr(
-        keypair,
-        "socialLogin",
-        register_device_id,
-        android_model_safe,
-        sso_config["oauth"]["client"]["organization"],
+        keypair, "socialLogin", register_device_id, android_model_safe, sso_config["oauth"]["client"]["organization"]
     )
 
     reg_headers = {
         "device-name": base64.b64encode(android_model.encode()).decode(),
         "authorization": f"Bearer {captcha_code}",
         "cert-format": "pem",
-        "client-authorization": "Basic "
-        + base64.b64encode(client_auth_str.encode()).decode(),
+        "client-authorization": "Basic " + base64.b64encode(client_auth_str.encode()).decode(),
         "create-session": "true",
         "code-verifier": client_code_verifier,
         "device-id": base64.b64encode(register_device_id.encode()).decode(),
         "redirect-uri": sso_config["oauth"]["client"]["client_ids"][0]["redirect_uri"],
     }
     csr = reformat_csr(csr)
-    reg_url = (
-        api_base_url
-        + sso_config["mag"]["system_endpoints"]["device_register_endpoint_path"]
-    )
+    reg_url = api_base_url + sso_config["mag"]["system_endpoints"]["device_register_endpoint_path"]
     reg_req = requests.post(reg_url, headers=reg_headers, data=csr)
     if reg_req.status_code != 200:
         print(f"\n\n{curlify.to_curl(reg_req.request)}")
-        raise Exception(
-            f'Could not register: {json.loads(reg_req.text)["error_description"]}'
-        )
+        raise Exception(f"Could not register: {json.loads(reg_req.text)['error_description']}")
 
     # TODO: step 5 token
-    token_req_url = (
-        api_base_url + sso_config["oauth"]["system_endpoints"]["token_endpoint_path"]
-    )
+    token_req_url = api_base_url + sso_config["oauth"]["system_endpoints"]["token_endpoint_path"]
     token_req_data = {
         "assertion": reg_req.headers["id-token"],
         "client_id": client_init_response["client_id"],
@@ -272,9 +252,7 @@ def do_login(endpoint_config):
         "grant_type": reg_req.headers["id-token-type"],
     }
     token_req = requests.post(
-        token_req_url,
-        headers={"mag-identifier": reg_req.headers["mag-identifier"]},
-        data=token_req_data,
+        token_req_url, headers={"mag-identifier": reg_req.headers["mag-identifier"]}, data=token_req_data
     )
     if token_req.status_code != 200:
         print(f"\n\n{curlify.to_curl(token_req.request)}")
@@ -293,6 +271,54 @@ def do_login(endpoint_config):
     return token_data
 
 
+def do_login_auth0(endpoint_config):
+    sso_config, api_base_url, is_auth0 = endpoint_config
+    auth_params = {
+        "client_id": sso_config["client"]["client_id"],
+        "response_type": "code",
+        "scope": sso_config["client"]["scope"],
+        "redirect_uri": sso_config["client"]["redirect_uri"],
+        "audience": sso_config["client"]["audience"],
+    }
+    authorize_url = api_base_url + sso_config["system_endpoints"]["authorization_endpoint_path"]
+    captcha_url = f"{authorize_url}?{'&'.join(f'{key}={value}' for key, value in auth_params.items())}"
+    captcha_code, captcha_sso_state = do_captcha(captcha_url, sso_config["client"]["redirect_uri"])
+
+    token_req_url = api_base_url + sso_config["system_endpoints"]["token_endpoint_path"]
+    token_req_data = {
+        "grant_type": "authorization_code",
+        "client_id": sso_config["client"]["client_id"],
+        "code": captcha_code,
+        "redirect_uri": sso_config["client"]["redirect_uri"],
+    }
+    token_req = requests.post(token_req_url, data=token_req_data)
+    if token_req.status_code != 200:
+        print(f"\n\n{curlify.to_curl(token_req.request)}")
+        print(token_req.text)
+        raise Exception("Could not get token data")
+
+    token_data = json.loads(token_req.text)
+    print(f"got token data from server")
+
+    print(token_data)
+
+    token_data["client_id"] = token_req_data["client_id"]
+    del token_data["expires_in"]
+    del token_data["token_type"]
+
+    write_datafile(token_data, logindata_file)
+    return token_data
+
+
+def do_login(endpoint_config):
+    sso_config, api_base_url, is_auth0 = endpoint_config
+
+    if is_auth0:
+        return do_login_auth0(endpoint_config)
+    else:
+        return do_login_non_auth0(endpoint_config)
+
+
 def read_data_file(file):
     token_data = None
     if os.path.isfile(file):
@@ -302,14 +328,7 @@ def read_data_file(file):
             print("failed parsing json")
 
         if token_data is not None:
-            required_fields = [
-                "access_token",
-                "refresh_token",
-                "scope",
-                "client_id",
-                "client_secret",
-                "mag-identifier",
-            ]
+            required_fields = ["access_token", "refresh_token", "scope", "client_id", "client_secret", "mag-identifier"]
             for i in required_fields:
                 if i not in token_data:
                     print(f"field {i} is missing from data file")
@@ -320,9 +339,7 @@ def read_data_file(file):
 # config
 is_debug = False
 logindata_file = "logindata.json"
-discovery_url = (
-    "https://clcloud.minimed.eu/connect/carepartner/v11/discover/android/3.2"
-)
+discovery_url = "https://clcloud.minimed.eu/connect/carepartner/v13/discover/android/3.6"
 rsa_keysize = 2048
 
 
@@ -334,9 +351,7 @@ def main(is_us_region):
 
     if token_data == None:
         print(f"performing login...")
-        endpoint_config = resolve_endpoint_config(
-            discovery_url, is_us_region=is_us_region
-        )
+        endpoint_config = resolve_endpoint_config(discovery_url, is_us_region=is_us_region)
         token_data = do_login(endpoint_config)
     else:
         print(f"token data file already exists")
@@ -344,9 +359,7 @@ def main(is_us_region):
 
 # Parse command line
 parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--us", help="Specify US region", default=False, action="store_true"
-)
+parser.add_argument("--us", help="Specify US region", default=False, action="store_true")
 args = parser.parse_args()
 
 main(args.us)
