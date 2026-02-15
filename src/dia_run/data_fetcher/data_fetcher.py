@@ -98,7 +98,7 @@ class DataFetcher:
         da = client.get_activity(self.latest_activity_id)
 
         # Get activity streams for heart rate and power
-        stream_types = ["heartrate", "watts", "velocity_smooth", "moving"]
+        stream_types = ["time", "heartrate", "watts", "velocity_smooth", "moving"]
         streams = client.get_activity_streams(self.latest_activity_id, types=stream_types, series_type="time")
 
         df_summary = pl.DataFrame(
