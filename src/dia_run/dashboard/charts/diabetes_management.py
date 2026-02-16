@@ -2,6 +2,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import polars as pl
 
+from dia_run.data_models.constants import TARGET_GLUCOSE_LOWER, TARGET_GLUCOSE_UPPER
 from dia_run.data_processing.data_processing import DataProcessor
 
 
@@ -46,9 +47,9 @@ def create_in_going_out_going_sensor_glucose_chart(data_processor: DataProcessor
         xref="x",
         yref="y",
         x0=df_summary["insulin_on_board_in_going"].min() - 0.1,
-        y0=180,
+        y0=TARGET_GLUCOSE_LOWER,
         x1=df_summary["insulin_on_board_in_going"].max() + 0.1,
-        y1=220,
+        y1=TARGET_GLUCOSE_UPPER,
         fillcolor="LightGray",
         opacity=0.2,
         layer="below",
