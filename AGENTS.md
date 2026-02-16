@@ -1,0 +1,173 @@
+# AGENTS.md
+
+Guidelines for AI coding agents working in this repository.
+
+## Project Overview
+
+Python application for analyzing diabetes management during running activities.
+Integrates Strava (running data) and CareLink (CGM/insulin data) with a Streamlit dashboard.
+
+- **Python:** >=3.12, <3.13
+- **Package manager:** uv (lockfile: `uv.lock`)
+- **Build system:** Hatchling
+- **Architecture:** `data_fetcher` (API clients) -> `data_models` (schemas/enums/paths) -> `data_processing` (business logic) -> `dashboard` (Streamlit + Plotly)
+
+## Build & Run Commands
+
+```bash
+# Install dependencies
+uv sync
+
+# Run the data fetcher CLI
+uv run fetch
+
+# Run the Streamlit dashboard
+uv run streamlit run src/dia_run/dashboard/app.py
+
+# Linting
+uv run ruff check src/ tests/
+uv run ruff check --fix src/ tests/
+
+# Formatting
+uv run ruff format src/ tests/
+uv run ruff format --check src/ tests/
+
+# Type checking
+uv run mypy src/
+
+# Run all tests
+uv run pytest
+
+# Run a single test file
+uv run pytest tests/test_data_processing/test_data_processor.py
+
+# Run a single test by name
+uv run pytest -k "test_get_summary"
+
+# Run tests with coverage
+uv run pytest --cov=dia_run
+
+# Version bump (commitizen)
+uv run cz bump
+```
+
+## Code Style
+
+### Formatting & Linting (Ruff)
+
+- **Line length:** 120 characters
+- **Enabled rules:** E (pycodestyle), F (pyflakes), D (pydocstyle), B (bugbear), I (isort), ARG (unused args), PLR0917 (max positional args)
+- **Ignored D rules:** D100-D107 (missing docstrings for modules/classes/functions), D203, D213, D417
+- Ruff handles both linting and formatting. Always run `ruff check` and `ruff format` before committing.
+
+### Imports
+
+- Order: standard library, third-party, local (enforced by isort via ruff `I` rule)
+- Use absolute imports from the package root: `from dia_run.data_models.paths import DataPaths`
+- No wildcard imports
+
+### Type Annotations (mypy strict mode)
+
+- **All functions must have complete type annotations** (enforced by `disallow_untyped_defs`, `disallow_untyped_calls`, `disallow_incomplete_defs`)
+- Use modern union syntax: `X | None` (not `Optional[X]`)
+- Use `pl.DataFrame | None` for nullable DataFrames
+- Use Pandera `DataFrame[Schema]` for validated return types
+- Use `TypeVar` for generic methods
+
+### Naming Conventions
+
+| Element          | Convention         | Example                          |
+|------------------|--------------------|----------------------------------|
+| Classes          | PascalCase         | `DataProcessor`, `RunType`       |
+| Functions/methods| snake_case         | `get_summary`, `create_chart`    |
+| Private methods  | `_leading_underscore` | `_load_summary_data`          |
+| Constants        | UPPER_SNAKE_CASE   | `PRE_RUN_INSULIN_MINUTES = 180`  |
+| Enums            | StrEnum, UPPER members | `RunType.EASY`, `RunType.INTERVAL` |
+| Files            | snake_case         | `data_processing.py`             |
+
+### Keyword-Only Arguments
+
+- **Max 1 positional argument** enforced by ruff PLR0917
+- Use `*` separator for keyword-only args: `def __init__(self, *, data_paths: DataPaths)`
+- This applies to all functions and methods (except `self`/`cls`)
+
+### Error Handling
+
+- Raise `ValueError` with descriptive messages for business logic errors
+- Use early-return patterns with `None` checks
+- Log with `loguru`: `from loguru import logger`, then `logger.info(...)`, `logger.error(...)`
+- Avoid broad `except` clauses in application code
+
+### Data Processing Patterns
+
+- **Polars** is the primary DataFrame library (not pandas). Use lazy frames (`pl.scan_delta()`) and materialize with `.collect()`
+- **Delta Lake** for data storage: read with `pl.scan_delta()`, write with `df.write_delta()`
+- **Pandera** `@check_types` decorator on public data-returning methods for runtime schema validation
+- **Pydantic** `BaseModel` for configuration and structured data models
+- Prefer method chaining: `.with_columns()`, `.filter()`, `.select()`, `.join()`
+
+## Testing
+
+- **Framework:** pytest with `pytest-cov`
+- **Test paths:** `tests/` and `src/` (configured in pyproject.toml)
+- Tests use session-scoped fixtures in `tests/conftest.py` that create Delta Lake tables in temp directories
+- Test classes: `TestClassName` with methods `test_method_name`
+- Use standard `assert` statements
+- Validate schemas explicitly in tests: `SummarySchema.validate(result)`
+- Fixtures must use keyword-only arguments (matching the project-wide convention)
+
+### Writing Tests
+
+```python
+import polars as pl
+import pytest
+
+from dia_run.data_models.paths import DataPaths
+from dia_run.data_processing.data_processing import DataProcessor
+
+
+class TestNewFeature:
+    def test_does_something(self, *, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(data_paths=test_data_paths)
+        result = processor.some_method()
+        assert result is not None
+```
+
+## Commit Convention
+
+- **Conventional Commits** enforced via commitizen: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`
+- Semver versioning with tag format `v$version`
+- CI auto-bumps version and generates changelog on push to `main`
+- Commit message in bump: `release $current_version -> $new_version [commitizen-skip-ci]`
+
+## Project Structure
+
+```
+src/dia_run/
+  data_fetcher/          # API clients (Strava, CareLink) and CLI
+    carelink_client.py   # Vendored CareLink API client
+    strava_client.py     # Strava API wrapper
+    data_fetcher.py      # CLI entry point (fetch command)
+    questionnaire.py     # Interactive run questionnaire
+  data_models/           # Schemas, enums, path config
+    schemas.py           # Pandera DataFrameSchemas
+    run_types.py         # RunType StrEnum
+    paths.py             # DataPaths Pydantic model
+    questionnaire.py     # QuestionnaireModel Pydantic model
+    calendar.py          # Calendar model
+  data_processing/       # Business logic
+    data_processing.py   # DataProcessor class (central data pipeline)
+  dashboard/             # Streamlit UI
+    app.py               # Dashboard entry point
+    charts/              # Plotly chart functions (pure functions)
+tests/
+  conftest.py            # Session-scoped fixtures with Delta Lake test data
+  test_data_processing/  # Tests for data processing logic
+```
+
+## Key Files
+
+- `pyproject.toml` — All project config (deps, ruff, mypy, pytest, commitizen)
+- `src/dia_run/data_processing/data_processing.py` — Core business logic
+- `src/dia_run/data_models/schemas.py` — All Pandera schemas
+- `tests/conftest.py` — Test data setup (Delta Lake tables in tmpdir)
