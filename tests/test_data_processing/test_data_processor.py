@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 import polars as pl
 
+from dia_run.data_models.kpis import KpiModel
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.questionnaire import QuestionnaireModel
 from dia_run.data_models.run_types import RunType
@@ -123,3 +124,54 @@ class TestDataProcessor:
 
         # Check that 0.0 values for CGM are replaced with None
         assert result.filter(pl.col("value") == 0.0).height == 0
+
+
+class TestKpis:
+    def test_get_30_day_kpis(self, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        # All 3 test activities are on March 25-27, 2025
+        result = processor.get_30_day_kpis(reference_date=datetime(2025, 3, 28))
+
+        assert isinstance(result, KpiModel)
+
+        # Total distance: (5000 + 8000 + 20000) / 1000 = 33.0 km
+        assert result.total_distance_km == 33.0
+
+        # Total running time: (1800 + 3600 + 7200) / 60 = 210 minutes
+        assert result.total_running_time_minutes == 210
+
+        # Avg sensor glucose should be present and positive
+        assert result.avg_sensor_glucose is not None
+        assert result.avg_sensor_glucose > 0
+
+        # Time in range should be present (percentage 0-100)
+        assert result.time_in_range_percentage is not None
+        assert 0 <= result.time_in_range_percentage <= 100
+
+    def test_get_30_day_kpis_no_data(self, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        # Reference date where 30-day window starts after all test activities (March 25-27)
+        result = processor.get_30_day_kpis(reference_date=datetime(2025, 5, 1))
+
+        assert isinstance(result, KpiModel)
+        assert result.total_distance_km == 0.0
+        assert result.total_running_time_minutes == 0
+        assert result.avg_sensor_glucose is None
+        assert result.time_in_range_percentage is None
+
+    def test_kpi_model_formatted_running_time(self) -> None:
+        kpis = KpiModel(
+            total_distance_km=33.0,
+            total_running_time_minutes=210,
+            avg_sensor_glucose=150.0,
+            time_in_range_percentage=66.7,
+        )
+        assert kpis.formatted_running_time == "3h 30m"
+
+        kpis_zero = KpiModel(
+            total_distance_km=0.0,
+            total_running_time_minutes=0,
+            avg_sensor_glucose=None,
+            time_in_range_percentage=None,
+        )
+        assert kpis_zero.formatted_running_time == "0h 0m"
