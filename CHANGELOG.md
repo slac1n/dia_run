@@ -1,3 +1,9 @@
+## v0.9.0 (2026-02-17)
+
+### Feat
+
+- **TG-14**: add CI workflow for pytest execution (#22)
+
 ## v0.8.0 (2026-02-17)
 
 ### Feat
