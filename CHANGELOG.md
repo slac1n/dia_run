@@ -1,3 +1,9 @@
+## v0.7.0 (2026-02-17)
+
+### Feat
+
+- **TG-23**: Visualize 30 days average KPIs (#20)
+
 ## v0.6.1 (2025-06-18)
 
 ### Fix
