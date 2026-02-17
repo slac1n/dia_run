@@ -5,6 +5,9 @@ from dia_run.dashboard.charts.activity_calendar import create_activity_calendar_
 from dia_run.dashboard.charts.diabetes_management import (
     create_in_going_out_going_sensor_glucose_chart,
     create_insulin_on_board_and_normalized_glucose_change_chart,
+    create_pre_nutrition_heatmap,
+    create_pre_nutrition_impact_chart,
+    create_pre_nutrition_timing_chart,
 )
 from dia_run.dashboard.charts.run_types import (
     create_run_type_distance_chart,
@@ -132,5 +135,17 @@ with tab3:
     )
     st.plotly_chart(
         create_insulin_on_board_and_normalized_glucose_change_chart(data_processor=data_processor),
+        use_container_width=True,
+    )
+    st.plotly_chart(
+        create_pre_nutrition_impact_chart(data_processor=data_processor),
+        use_container_width=True,
+    )
+    st.plotly_chart(
+        create_pre_nutrition_timing_chart(data_processor=data_processor),
+        use_container_width=True,
+    )
+    st.plotly_chart(
+        create_pre_nutrition_heatmap(data_processor=data_processor),
         use_container_width=True,
     )
