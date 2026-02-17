@@ -316,12 +316,13 @@ def create_pre_nutrition_heatmap(data_processor: DataProcessor) -> go.Figure:
     lower_norm = max(0.0, min(1.0, lower_norm))
     upper_norm = max(0.0, min(1.0, upper_norm))
 
+    mid_norm = (lower_norm + upper_norm) / 2
+
     colorscale: list[list[float | str]] = [
         [0.0, "rgb(49, 130, 189)"],
-        [lower_norm, "rgb(49, 130, 189)"],
-        [lower_norm, "rgb(44, 160, 44)"],
-        [upper_norm, "rgb(44, 160, 44)"],
-        [upper_norm, "rgb(214, 39, 40)"],
+        [lower_norm, "rgb(130, 200, 130)"],
+        [mid_norm, "rgb(44, 160, 44)"],
+        [upper_norm, "rgb(200, 130, 80)"],
         [1.0, "rgb(214, 39, 40)"],
     ]
 
