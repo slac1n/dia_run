@@ -1,3 +1,9 @@
+## v0.8.0 (2026-02-17)
+
+### Feat
+
+- **TG-17**: add pre-commit hooks for ruff and mypy (#21)
+
 ## v0.7.0 (2026-02-17)
 
 ### Feat
