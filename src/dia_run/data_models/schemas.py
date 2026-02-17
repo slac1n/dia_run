@@ -79,3 +79,12 @@ class PreRunInsulinSchema(DataFrameModel):
     datetime: Series[datetime]
     start_date_local: Series[datetime]
     value: Series[float] = Field(ge=0)
+
+
+class PreRunNutritionSummarySchema(DataFrameModel):
+    activity_id: Series[int] = Field(unique=True)
+    total_carbohydrates_g: Series[int] = Field(gt=0)
+    earliest_time_before_start_min: Series[int] = Field(le=0)
+    avg_bolus_percentage: Series[float] = Field(ge=0)
+    in_going_sg: Series[float] = Field(gt=0)
+    name_date: Series[str]

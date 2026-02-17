@@ -18,6 +18,7 @@ from dia_run.data_models.schemas import (
     GlucoseStreamsSchema,
     HeartrateStreamsSchema,
     PreRunInsulinSchema,
+    PreRunNutritionSummarySchema,
     SpecificCarelinkSchema,
     StravaSummarySchema,
     SummarySchema,
@@ -108,6 +109,44 @@ class DataProcessor:
         with open(self.data_paths.questionnaire / f"{activity_id}.json") as f:
             data = json.load(f)
         return QuestionnaireModel.model_validate(data)
+
+    @check_types
+    def get_pre_run_nutrition_summary(self) -> DataFrame[PreRunNutritionSummarySchema]:
+        df_summary = self.get_summary()
+        nutrition_rows: list[dict[str, int | float | str]] = []
+
+        for row in df_summary.iter_rows(named=True):
+            activity_id: int = row["activity_id"]
+            in_going_sg = row["in_going_sg"]
+            name_date: str = row["name_date"]
+
+            if in_going_sg is None:
+                continue
+
+            questionnaire_path = self.data_paths.questionnaire / f"{activity_id}.json"
+            if not questionnaire_path.exists():
+                continue
+
+            questionnaire = self.get_questionnaire(activity_id)
+            if not questionnaire.pre_run:
+                continue
+
+            total_carbs = sum(entry.carbohydrates_g for entry in questionnaire.pre_run)
+            earliest_timing = min(entry.time_before_start_min for entry in questionnaire.pre_run)
+            avg_bolus = sum(entry.bolus_percentage for entry in questionnaire.pre_run) / len(questionnaire.pre_run)
+
+            nutrition_rows.append(
+                {
+                    "activity_id": activity_id,
+                    "total_carbohydrates_g": total_carbs,
+                    "earliest_time_before_start_min": earliest_timing,
+                    "avg_bolus_percentage": avg_bolus,
+                    "in_going_sg": in_going_sg,
+                    "name_date": name_date,
+                }
+            )
+
+        return pl.DataFrame(nutrition_rows)
 
     @check_types
     def get_heartrate_streams(self) -> DataFrame[HeartrateStreamsSchema]:

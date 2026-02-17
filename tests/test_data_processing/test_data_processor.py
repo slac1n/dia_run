@@ -4,11 +4,11 @@ import polars as pl
 
 from dia_run.data_models.kpis import KpiModel
 from dia_run.data_models.paths import DataPaths
-from dia_run.data_models.questionnaire import QuestionnaireModel
 from dia_run.data_models.run_types import RunType
 from dia_run.data_models.schemas import (
     GlucoseStreamsSchema,
     HeartrateStreamsSchema,
+    PreRunNutritionSummarySchema,
     SpecificCarelinkSchema,
     SummarySchema,
 )
@@ -124,6 +124,32 @@ class TestDataProcessor:
 
         # Check that 0.0 values for CGM are replaced with None
         assert result.filter(pl.col("value") == 0.0).height == 0
+
+    def test_get_pre_run_nutrition_summary(self, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        result = processor.get_pre_run_nutrition_summary()
+
+        PreRunNutritionSummarySchema.validate(result)
+
+        # Activity 1001 has no pre-run nutrition -> excluded
+        assert 1001 not in result["activity_id"].to_list()
+        assert len(result) == 2
+
+        # Activity 1002: 30g carbs, -30 min, 70% bolus
+        row_1002 = result.filter(pl.col("activity_id") == 1002)
+        assert row_1002["total_carbohydrates_g"].item() == 30
+        assert row_1002["earliest_time_before_start_min"].item() == -30
+        assert row_1002["avg_bolus_percentage"].item() == 70.0
+        assert row_1002["in_going_sg"].item() is not None
+        assert row_1002["in_going_sg"].item() > 0
+
+        # Activity 1003: 40g carbs, -60 min, 80% bolus
+        row_1003 = result.filter(pl.col("activity_id") == 1003)
+        assert row_1003["total_carbohydrates_g"].item() == 40
+        assert row_1003["earliest_time_before_start_min"].item() == -60
+        assert row_1003["avg_bolus_percentage"].item() == 80.0
+        assert row_1003["in_going_sg"].item() is not None
+        assert row_1003["in_going_sg"].item() > 0
 
 
 class TestKpis:
