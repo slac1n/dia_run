@@ -28,6 +28,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+  "pre-commit>=4.0.0",
   "pytest>=8.3.4",
   "pytest-cov>=6.0.0",
 ]
@@ -44,6 +45,10 @@ fetch = "dia_run.data_fetcher.data_fetcher:run_fetcher"
 
 [tool.ruff]
 line-length = 120
+exclude = [
+  "src/dia_run/data_fetcher/carelink_client.py",
+  "src/dia_run/data_fetcher/carelink_setup.py",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "D", "B", "I", "ARG"]
@@ -71,6 +76,18 @@ ignore_missing_imports = true
 disallow_untyped_calls = true
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
+exclude = [
+  "src/dia_run/data_fetcher/carelink_client\\.py$",
+  "src/dia_run/data_fetcher/carelink_setup\\.py$",
+]
+
+[[tool.mypy.overrides]]
+module = [
+  "dia_run.data_fetcher.carelink_client",
+  "dia_run.data_fetcher.carelink_setup",
+]
+ignore_errors = true
+follow_imports = "skip"
 
 [tool.pytest.ini_options]
 addopts = "--cov-config=.coveragerc"

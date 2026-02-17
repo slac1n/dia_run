@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import plotly.graph_objects as go
 import polars as pl
@@ -39,7 +39,7 @@ def create_activity_calendar_chart(df: pl.DataFrame) -> go.Figure:
     return fig
 
 
-def _calculate_daily_distances(*, data: pl.DataFrame, start_date: datetime) -> dict[datetime.date, float]:
+def _calculate_daily_distances(*, data: pl.DataFrame, start_date: datetime) -> dict[date, float]:
     daily_distances = (
         data.filter(pl.col("start_date_local") >= start_date)
         .with_columns([pl.col("distance_in_km").cast(pl.Float64).alias("distance_km_numeric")])
@@ -50,14 +50,14 @@ def _calculate_daily_distances(*, data: pl.DataFrame, start_date: datetime) -> d
     return {row["start_date_local"].date(): row["total_distance_km"] for row in daily_distances.to_dicts()}
 
 
-def _create_distance_date_calendar(*, date_range: pl.Series, date_to_distance: dict[datetime.date, float]) -> Calendar:
+def _create_distance_date_calendar(*, date_range: pl.Series, date_to_distance: dict[date, float]) -> Calendar:
     calendar = Calendar(distance=[[] for _ in range(7)], dates=[[] for _ in range(7)])
     current_week = _reset_week()
 
-    for i, date in enumerate(date_range):
-        weekday = date.weekday()
-        current_week.distance[weekday] = date_to_distance.get(date, 0.0)
-        current_week.dates[weekday] = date.strftime("%Y-%m-%d")
+    for i, current_date in enumerate(date_range):
+        weekday = current_date.weekday()
+        current_week.distance[weekday] = date_to_distance.get(current_date, 0.0)
+        current_week.dates[weekday] = current_date.strftime("%Y-%m-%d")
 
         if weekday == 6 or i == len(date_range) - 1:
             calendar = _append_current_week_to_calendar(calendar=calendar, current_week=current_week)

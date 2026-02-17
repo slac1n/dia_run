@@ -18,6 +18,12 @@ Integrates Strava (running data) and CareLink (CGM/insulin data) with a Streamli
 # Install dependencies
 uv sync
 
+# Set up pre-commit hooks (ruff + mypy)
+uv run pre-commit install
+
+# Run pre-commit hooks manually on all files
+uv run pre-commit run --all-files
+
 # Run the data fetcher CLI
 uv run fetch
 
