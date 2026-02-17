@@ -1,11 +1,13 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TypeVar
 
 import polars as pl
 from pandera import check_types
 from pandera.typing.polars import DataFrame, LazyFrame
 
+from dia_run.data_models.constants import TARGET_GLUCOSE_LOWER, TARGET_GLUCOSE_UPPER
+from dia_run.data_models.kpis import KpiModel
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.questionnaire import QuestionnaireModel
 from dia_run.data_models.run_types import RunType
@@ -43,6 +45,42 @@ class DataProcessor:
             self.df_summary = lf_summary.collect()
 
         return self.df_summary
+
+    def get_30_day_kpis(self, *, reference_date: datetime | None = None) -> KpiModel:
+        self.get_summary()
+        reference = reference_date or datetime.now()
+        cutoff = reference - timedelta(days=30)
+
+        df_recent = self.df_summary.filter(pl.col("start_date_local") >= cutoff)  # type: ignore[union-attr]
+
+        total_distance_km = round(df_recent["distance"].sum() / 1000, 1)
+        total_running_time_minutes = int(df_recent["moving_time"].sum() // 60)
+
+        df_with_glucose = df_recent.drop_nulls(subset=["avg_sg", "moving_time"])
+        if df_with_glucose.is_empty():
+            avg_sensor_glucose = None
+            time_in_range_percentage = None
+        else:
+            total_moving_time = df_with_glucose["moving_time"].sum()
+            if total_moving_time == 0:
+                avg_sensor_glucose = None
+                time_in_range_percentage = None
+            else:
+                avg_sensor_glucose = round(
+                    (df_with_glucose["avg_sg"] * df_with_glucose["moving_time"]).sum() / total_moving_time,
+                    1,
+                )  # type: ignore[arg-type]
+                time_in_range_seconds = df_with_glucose.filter(
+                    (pl.col("avg_sg") >= TARGET_GLUCOSE_LOWER) & (pl.col("avg_sg") <= TARGET_GLUCOSE_UPPER)
+                )["moving_time"].sum()
+                time_in_range_percentage = round(time_in_range_seconds / total_moving_time * 100, 1)
+
+        return KpiModel(
+            total_distance_km=total_distance_km,
+            total_running_time_minutes=total_running_time_minutes,
+            avg_sensor_glucose=avg_sensor_glucose,
+            time_in_range_percentage=time_in_range_percentage,
+        )
 
     @check_types
     def get_specific_carelink(

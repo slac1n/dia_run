@@ -1,6 +1,7 @@
 import plotly.graph_objects as go
 import polars as pl
 
+from dia_run.data_models.constants import TARGET_GLUCOSE_LOWER, TARGET_GLUCOSE_UPPER
 from dia_run.data_models.run_types import RunType
 from dia_run.data_processing.data_processing import DataProcessor
 
@@ -77,8 +78,8 @@ def create_run_type_glucose_chart(*, data_processor: DataProcessor, run_type_ord
         )
         # highlight the target range
     fig.add_hrect(
-        y0=180,
-        y1=220,
+        y0=TARGET_GLUCOSE_LOWER,
+        y1=TARGET_GLUCOSE_UPPER,
         line_width=0,
         fillcolor="LightGray",
         opacity=0.2,

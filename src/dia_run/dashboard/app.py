@@ -21,6 +21,7 @@ data_paths = DataPaths()
 
 data_processor = DataProcessor(data_paths)
 df_summary = data_processor.get_summary()
+kpis = data_processor.get_30_day_kpis()
 
 st.set_page_config(
     page_title="Dia-Run",
@@ -28,6 +29,16 @@ st.set_page_config(
 )
 
 st.title("Dia-Run Dashboard")
+
+st.subheader("Last 30 Days")
+kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
+kpi_col1.metric("Total Distance", f"{kpis.total_distance_km:.1f} km")
+kpi_col2.metric("Total Running Time", kpis.formatted_running_time)
+kpi_col3.metric("Avg Sensor Glucose", f"{kpis.avg_sensor_glucose:.0f} mg/dL" if kpis.avg_sensor_glucose else "N/A")
+kpi_col4.metric(
+    "Time in Range", f"{kpis.time_in_range_percentage:.0f}%" if kpis.time_in_range_percentage is not None else "N/A"
+)
+
 tab1, tab2, tab3 = st.tabs(["Activities", "Run Type Analysis", "Diabetes Insights"])
 
 with tab1:

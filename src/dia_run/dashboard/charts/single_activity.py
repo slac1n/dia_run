@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import polars as pl
 from plotly.subplots import make_subplots
 
+from dia_run.data_models.constants import TARGET_GLUCOSE_LOWER, TARGET_GLUCOSE_UPPER
 from dia_run.data_processing.data_processing import DataProcessor
 
 
@@ -68,9 +69,9 @@ def create_single_activity_carelink_chart(*, data_processor: DataProcessor, acti
         xref="x",
         yref="y",
         x0=start_datetime,
-        y0=180,
+        y0=TARGET_GLUCOSE_LOWER,
         x1=end_datetime,
-        y1=220,
+        y1=TARGET_GLUCOSE_UPPER,
         fillcolor="LightGray",
         opacity=0.2,
         layer="below",
