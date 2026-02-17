@@ -5,6 +5,17 @@
 uv sync
 ```
 
+### Pre-Commit Hooks
+This project uses [pre-commit](https://pre-commit.com/) to run ruff (linting + formatting) and mypy (type checking) automatically before each commit. After installing dependencies, set up the hooks:
+```bash
+uv run pre-commit install
+```
+
+To run all hooks manually against the entire codebase:
+```bash
+uv run pre-commit run --all-files
+```
+
 ### Prepare Strava
 You need to set up [Strava API](https://developers.strava.com/docs/getting-started/) for you account and create an app.
 After that create a `.env` file and fill out the variables `CLIENT_ID` and `CLIENT_SECRET` from your newly created app.
