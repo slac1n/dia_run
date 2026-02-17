@@ -146,6 +146,18 @@ class DataProcessor:
                 }
             )
 
+        if not nutrition_rows:
+            return pl.DataFrame(
+                schema={
+                    "activity_id": pl.Int64,
+                    "total_carbohydrates_g": pl.Int64,
+                    "earliest_time_before_start_min": pl.Int64,
+                    "avg_bolus_percentage": pl.Float64,
+                    "in_going_sg": pl.Float64,
+                    "name_date": pl.Utf8,
+                }
+            )
+
         return pl.DataFrame(nutrition_rows)
 
     @check_types

@@ -151,6 +151,30 @@ class TestDataProcessor:
         assert row_1003["in_going_sg"].item() is not None
         assert row_1003["in_going_sg"].item() > 0
 
+    def test_get_pre_run_nutrition_summary_empty(self, test_data_paths: DataPaths) -> None:
+        empty_questionnaire_dir = test_data_paths.questionnaire.parent / "empty_questionnaires"
+        empty_questionnaire_dir.mkdir(parents=True, exist_ok=True)
+
+        empty_paths = DataPaths(
+            carelink=test_data_paths.carelink,
+            strava_summary=test_data_paths.strava_summary,
+            strava_stream=test_data_paths.strava_stream,
+            questionnaire=empty_questionnaire_dir,
+        )
+        processor = DataProcessor(empty_paths)
+        result = processor.get_pre_run_nutrition_summary()
+
+        PreRunNutritionSummarySchema.validate(result)
+        assert result.is_empty()
+        assert set(result.columns) == {
+            "activity_id",
+            "total_carbohydrates_g",
+            "earliest_time_before_start_min",
+            "avg_bolus_percentage",
+            "in_going_sg",
+            "name_date",
+        }
+
 
 class TestKpis:
     def test_get_30_day_kpis(self, test_data_paths: DataPaths) -> None:
