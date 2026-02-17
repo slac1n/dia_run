@@ -56,20 +56,24 @@ class DataProcessor:
         total_distance_km = round(df_recent["distance"].sum() / 1000, 1)
         total_running_time_minutes = int(df_recent["moving_time"].sum() // 60)
 
-        df_with_glucose = df_recent.drop_nulls(subset=["avg_sg"])
+        df_with_glucose = df_recent.drop_nulls(subset=["avg_sg", "moving_time"])
         if df_with_glucose.is_empty():
             avg_sensor_glucose = None
             time_in_range_percentage = None
         else:
-            avg_sensor_glucose = round(
-                (df_with_glucose["avg_sg"] * df_with_glucose["moving_time"]).sum()
-                / df_with_glucose["moving_time"].sum(),
-                1,
-            )  # type: ignore[arg-type]
-            in_range_count = df_with_glucose.filter(
-                (pl.col("avg_sg") >= TARGET_GLUCOSE_LOWER) & (pl.col("avg_sg") <= TARGET_GLUCOSE_UPPER)
-            ).height
-            time_in_range_percentage = round(in_range_count / df_with_glucose.height * 100, 1)
+            total_moving_time = df_with_glucose["moving_time"].sum()
+            if total_moving_time == 0:
+                avg_sensor_glucose = None
+                time_in_range_percentage = None
+            else:
+                avg_sensor_glucose = round(
+                    (df_with_glucose["avg_sg"] * df_with_glucose["moving_time"]).sum() / total_moving_time,
+                    1,
+                )  # type: ignore[arg-type]
+                time_in_range_seconds = df_with_glucose.filter(
+                    (pl.col("avg_sg") >= TARGET_GLUCOSE_LOWER) & (pl.col("avg_sg") <= TARGET_GLUCOSE_UPPER)
+                )["moving_time"].sum()
+                time_in_range_percentage = round(time_in_range_seconds / total_moving_time * 100, 1)
 
         return KpiModel(
             total_distance_km=total_distance_km,
