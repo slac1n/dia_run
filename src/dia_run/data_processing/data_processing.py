@@ -61,7 +61,11 @@ class DataProcessor:
             avg_sensor_glucose = None
             time_in_range_percentage = None
         else:
-            avg_sensor_glucose = round(df_with_glucose["avg_sg"].mean(), 1)  # type: ignore[arg-type]
+            avg_sensor_glucose = round(
+                (df_with_glucose["avg_sg"] * df_with_glucose["moving_time"]).sum()
+                / df_with_glucose["moving_time"].sum(),
+                1,
+            )  # type: ignore[arg-type]
             in_range_count = df_with_glucose.filter(
                 (pl.col("avg_sg") >= TARGET_GLUCOSE_LOWER) & (pl.col("avg_sg") <= TARGET_GLUCOSE_UPPER)
             ).height
