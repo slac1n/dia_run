@@ -9,6 +9,10 @@ from dia_run.dashboard.charts.diabetes_management import (
     create_pre_nutrition_impact_chart,
     create_pre_nutrition_timing_chart,
 )
+from dia_run.dashboard.charts.fueling_impact import (
+    create_fueling_carbs_vs_peak_chart,
+    create_fueling_glucose_response_chart,
+)
 from dia_run.dashboard.charts.run_types import (
     create_run_type_distance_chart,
     create_run_type_glucose_chart,
@@ -42,7 +46,7 @@ kpi_col4.metric(
     "Time in Range", f"{kpis.time_in_range_percentage:.0f}%" if kpis.time_in_range_percentage is not None else "N/A"
 )
 
-tab1, tab2, tab3 = st.tabs(["Activities", "Run Type Analysis", "Diabetes Insights"])
+tab1, tab2, tab3, tab4 = st.tabs(["Activities", "Run Type Analysis", "Diabetes Insights", "Fueling Impact"])
 
 with tab1:
     st.header("Overview of Running Activities :runner:")
@@ -147,5 +151,15 @@ with tab3:
     )
     st.plotly_chart(
         create_pre_nutrition_heatmap(data_processor=data_processor),
+        use_container_width=True,
+    )
+
+with tab4:
+    st.plotly_chart(
+        create_fueling_glucose_response_chart(data_processor=data_processor),
+        use_container_width=True,
+    )
+    st.plotly_chart(
+        create_fueling_carbs_vs_peak_chart(data_processor=data_processor),
         use_container_width=True,
     )

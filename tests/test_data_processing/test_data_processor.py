@@ -6,6 +6,8 @@ from dia_run.data_models.kpis import KpiModel
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.run_types import RunType
 from dia_run.data_models.schemas import (
+    FuelingGlucoseWindowSchema,
+    FuelingImpactSchema,
     GlucoseStreamsSchema,
     HeartrateStreamsSchema,
     PreRunNutritionSummarySchema,
@@ -225,3 +227,183 @@ class TestKpis:
             time_in_range_percentage=None,
         )
         assert kpis_zero.formatted_running_time == "0h 0m"
+
+
+class TestFuelingGlucoseWindows:
+    def test_get_fueling_glucose_windows(self, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        result = processor.get_fueling_glucose_windows()
+
+        FuelingGlucoseWindowSchema.validate(result)
+
+        # Activity 1001 has no fueling -> excluded
+        assert 1001 not in result["activity_id"].to_list()
+
+        # Activity 1002 has 1 fueling event (at +15 min), run ends at +60 min
+        # Window: -15 min to +45 min (relative to fueling)
+        events_1002 = result.filter(pl.col("activity_id") == 1002)
+        assert set(events_1002["fueling_index"].unique().to_list()) == {0}
+        assert events_1002["minutes_relative"].min() >= -15.0
+        assert events_1002["minutes_relative"].max() <= 45.0
+
+        # Activity 1003 has 2 fueling events (at +15 and +30 min)
+        events_1003 = result.filter(pl.col("activity_id") == 1003)
+        assert set(events_1003["fueling_index"].unique().to_list()) == {0, 1}
+
+        # Fueling 0: truncated at next intake (+30 min), so max relative = 15 min
+        event_0 = events_1003.filter(pl.col("fueling_index") == 0)
+        assert not event_0.is_empty()
+        assert event_0["minutes_relative"].min() >= -15.0
+        assert event_0["minutes_relative"].max() <= 15.0
+
+        # Fueling 1: window from +30 to min(+30+45=+75, +120) = +75, so max relative = 45 min
+        event_1 = events_1003.filter(pl.col("fueling_index") == 1)
+        assert not event_1.is_empty()
+        assert event_1["minutes_relative"].min() >= -15.0
+        assert event_1["minutes_relative"].max() <= 45.0
+
+    def test_get_fueling_glucose_windows_time_alignment(self, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        result = processor.get_fueling_glucose_windows()
+
+        # Activity 1002: fueling at +15 min from start (18:15)
+        # First CGM point should be at or near minute_relative=-15 (15 min before fueling)
+        events_1002 = result.filter((pl.col("activity_id") == 1002) & (pl.col("fueling_index") == 0)).sort(
+            "minutes_relative"
+        )
+        first_min_rel = events_1002["minutes_relative"].head(1).item()
+        assert first_min_rel == -15.0  # CGM exists at -15 min relative to fueling (15 min before intake)
+
+    def test_get_fueling_glucose_windows_no_post_run_data(self, test_data_paths: DataPaths) -> None:
+        """Windows must not include any glucose data after the activity end time."""
+        processor = DataProcessor(test_data_paths)
+        result = processor.get_fueling_glucose_windows()
+
+        # Activity 1002: run is 60 min, fueling at +15 min, window max = 45 min from fueling
+        # So absolute max datetime = 18:15 + 45min = 19:00 = run end. No post-run.
+        events_1002 = result.filter(pl.col("activity_id") == 1002)
+        assert events_1002["minutes_relative"].max() <= 45.0
+
+        # Activity 1003: run is 120 min, fueling 1 at +30 min, window = 45 min
+        # Absolute max datetime = 14:30 + 45min = 15:15, well within 16:00 end
+        events_1003_f1 = result.filter((pl.col("activity_id") == 1003) & (pl.col("fueling_index") == 1))
+        assert events_1003_f1["minutes_relative"].max() <= 45.0
+
+    def test_get_fueling_glucose_windows_empty(self, test_data_paths: DataPaths) -> None:
+        empty_questionnaire_dir = test_data_paths.questionnaire.parent / "empty_questionnaires_fuel"
+        empty_questionnaire_dir.mkdir(parents=True, exist_ok=True)
+
+        empty_paths = DataPaths(
+            carelink=test_data_paths.carelink,
+            strava_summary=test_data_paths.strava_summary,
+            strava_stream=test_data_paths.strava_stream,
+            questionnaire=empty_questionnaire_dir,
+        )
+        processor = DataProcessor(empty_paths)
+        result = processor.get_fueling_glucose_windows()
+
+        FuelingGlucoseWindowSchema.validate(result)
+        assert result.is_empty()
+        assert set(result.columns) == {"activity_id", "fueling_index", "minutes_relative", "value"}
+
+
+class TestFuelingImpact:
+    def test_get_fueling_impact(self, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        result = processor.get_fueling_impact()
+
+        FuelingImpactSchema.validate(result)
+
+        # Activity 1001 has no fueling -> excluded
+        assert 1001 not in result["activity_id"].to_list()
+
+        # Should have 3 fueling events total: 1 from 1002, 2 from 1003
+        assert len(result) == 3
+
+    def test_get_fueling_impact_activity_1002(self, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        result = processor.get_fueling_impact()
+
+        # Activity 1002: 15g Energy Gel at +15 min, run ends at +60 min
+        # Window is capped to activity end (45 min of data)
+        # CGM values decline during this window (no rise in in-run data)
+        row_1002 = result.filter((pl.col("activity_id") == 1002) & (pl.col("fueling_index") == 0))
+        assert row_1002["carbohydrates_g"].item() == 15
+        assert row_1002["baseline_sg"].item() is not None
+        assert row_1002["baseline_sg"].item() > 0
+
+        # Peak and baseline are computed from in-run data only
+        assert row_1002["peak_sg"].item() is not None
+        assert row_1002["time_to_peak_min"].item() is not None
+
+    def test_get_fueling_impact_activity_1003(self, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        result = processor.get_fueling_impact()
+
+        # Activity 1003: 2 fueling events
+        events_1003 = result.filter(pl.col("activity_id") == 1003)
+        assert len(events_1003) == 2
+
+        # Fueling 0: 20g Energy Gel at +15 min (window truncated at +30 min = 15 min of data)
+        fuel_0 = events_1003.filter(pl.col("fueling_index") == 0)
+        assert fuel_0["carbohydrates_g"].item() == 20
+
+        # Fueling 1: 25g Sports Drink at +30 min (window = 45 min of data)
+        fuel_1 = events_1003.filter(pl.col("fueling_index") == 1)
+        assert fuel_1["carbohydrates_g"].item() == 25
+
+        # Both should have baseline values
+        for fuel in [fuel_0, fuel_1]:
+            assert fuel["baseline_sg"].item() is not None
+            assert fuel["peak_sg"].item() is not None
+
+    def test_get_fueling_impact_windows_respect_activity_end(self, test_data_paths: DataPaths) -> None:
+        """Peak values should come from in-run data only (no post-activity data)."""
+        processor = DataProcessor(test_data_paths)
+        result = processor.get_fueling_impact()
+
+        # Activity 1002: window includes 15 min pre-intake (-15 to 0) + 45 min post-intake (0 to +45, clamped to +45)
+        # Pre-intake CGM values: 140.0 at -15 min (first in window)
+        # In-run CGM values from fueling time (i=15) to end (i=60) are 140.0 - i/10, declining from 138.5 to 134.0
+        # Peak = 140.0 at minute -15 (pre-intake)
+        row_1002 = result.filter((pl.col("activity_id") == 1002) & (pl.col("fueling_index") == 0))
+        assert row_1002["peak_sg"].item() == 140.0
+        assert row_1002["time_to_peak_min"].item() == -15.0
+
+    def test_get_fueling_impact_overlapping_windows_truncated(self, test_data_paths: DataPaths) -> None:
+        """First fueling window should be truncated at the next fueling time."""
+        processor = DataProcessor(test_data_paths)
+        result = processor.get_fueling_impact()
+
+        # Activity 1003, fueling 0: window is only 15 min (truncated at next intake at +30 min)
+        # CGM values are all 170.0 in this flat window
+        fuel_0 = result.filter((pl.col("activity_id") == 1003) & (pl.col("fueling_index") == 0))
+        assert fuel_0["peak_sg"].item() == 170.0
+        assert fuel_0["baseline_sg"].item() == 170.0
+        assert fuel_0["peak_increase"].item() == 0.0
+
+    def test_get_fueling_impact_empty(self, test_data_paths: DataPaths) -> None:
+        empty_questionnaire_dir = test_data_paths.questionnaire.parent / "empty_questionnaires_impact"
+        empty_questionnaire_dir.mkdir(parents=True, exist_ok=True)
+
+        empty_paths = DataPaths(
+            carelink=test_data_paths.carelink,
+            strava_summary=test_data_paths.strava_summary,
+            strava_stream=test_data_paths.strava_stream,
+            questionnaire=empty_questionnaire_dir,
+        )
+        processor = DataProcessor(empty_paths)
+        result = processor.get_fueling_impact()
+
+        FuelingImpactSchema.validate(result)
+        assert result.is_empty()
+        assert set(result.columns) == {
+            "activity_id",
+            "fueling_index",
+            "carbohydrates_g",
+            "baseline_sg",
+            "peak_sg",
+            "peak_increase",
+            "time_to_peak_min",
+            "name_date",
+        }
