@@ -31,6 +31,7 @@ dev = [
   "pre-commit>=4.0.0",
   "pytest>=8.3.4",
   "pytest-cov>=6.0.0",
+  "types-requests>=2.31.0",
 ]
 
 [build-system]
@@ -42,6 +43,7 @@ packages = ["src/dia_run"]
 
 [project.scripts]
 fetch = "dia_run.data_fetcher.data_fetcher:run_fetcher"
+taiga = "dia_run.taiga.taiga_client:main"
 
 [tool.ruff]
 line-length = 120
@@ -88,6 +90,10 @@ module = [
 ]
 ignore_errors = true
 follow_imports = "skip"
+
+[[tool.mypy.overrides]]
+module = "requests"
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 addopts = "--cov-config=.coveragerc"
