@@ -1,3 +1,9 @@
+## v0.11.0 (2026-02-21)
+
+### Feat
+
+- add Taiga integration with OpenCode /taiga command (#26)
+
 ## v0.10.1 (2026-02-21)
 
 ### Fix
