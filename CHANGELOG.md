@@ -1,3 +1,13 @@
+## v0.10.0 (2026-02-21)
+
+### Feat
+
+- **TG-7**: visualize pre-nutrition impact on in-going sensor glucose (#23)
+
+### Fix
+
+- use PAT_TOKEN instead of GITHUB_TOKEN in bumpversion workflow (#25)
+
 ## v0.9.0 (2026-02-17)
 
 ### Feat
