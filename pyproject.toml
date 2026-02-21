@@ -1,6 +1,6 @@
 [project]
 name = "dia-run"
-version = "0.10.0"
+version = "0.10.1"
 description = "A tool to gain insights into diabetes and running"
 readme = "README.md"
 requires-python = ">=3.12, <3.13"
