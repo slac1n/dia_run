@@ -1,3 +1,9 @@
+## v0.12.0 (2026-02-21)
+
+### Feat
+
+- **TG-6**: visualize fueling impact on sensor glucose levels (#27)
+
 ## v0.11.0 (2026-02-21)
 
 ### Feat
