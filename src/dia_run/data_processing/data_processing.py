@@ -15,6 +15,8 @@ from dia_run.data_models.schemas import (
     AggregatedGlucoseSchema,
     AggregateInsulinOnBoard,
     BaseGlucoseStreamSchema,
+    FuelingGlucoseWindowSchema,
+    FuelingImpactSchema,
     GlucoseStreamsSchema,
     HeartrateStreamsSchema,
     PreRunInsulinSchema,
@@ -174,6 +176,186 @@ class DataProcessor:
     def get_glucose_streams(self) -> DataFrame[GlucoseStreamsSchema]:
         lf_summary = self._load_summary_data()
         return self._load_glucose_data(lf_summary).drop("activity_id").collect()
+
+    FUELING_WINDOW_MINUTES = 45
+    PRE_INTAKE_WINDOW_MINUTES = 15
+
+    @check_types
+    def get_fueling_glucose_windows(self) -> DataFrame[FuelingGlucoseWindowSchema]:
+        df_summary = self.get_summary()
+        window_rows: list[dict[str, int | float | None]] = []
+
+        for row in df_summary.iter_rows(named=True):
+            activity_id: int = row["activity_id"]
+            start_date_local: datetime = row["start_date_local"]
+            end_date_local: datetime = row["end_date_local"]
+
+            questionnaire_path = self.data_paths.questionnaire / f"{activity_id}.json"
+            if not questionnaire_path.exists():
+                continue
+
+            questionnaire = self.get_questionnaire(activity_id)
+            if not questionnaire.fueling_during_run:
+                continue
+
+            df_cgm = (
+                pl.scan_delta(str(self.data_paths.carelink))
+                .filter((pl.col("type") == "CGM") & (pl.col("activity_id") == activity_id))
+                .select(["datetime", "value"])
+                .with_columns(pl.col("value").replace(0.0, None))
+                .sort("datetime")
+                .collect()
+            )
+
+            if df_cgm.is_empty():
+                continue
+
+            fueling_list = questionnaire.fueling_during_run
+            for fueling_index, fueling in enumerate(fueling_list):
+                fueling_datetime = start_date_local + timedelta(minutes=fueling.time_during_run_min)
+                window_start = fueling_datetime - timedelta(minutes=self.PRE_INTAKE_WINDOW_MINUTES)
+                window_end = fueling_datetime + timedelta(minutes=self.FUELING_WINDOW_MINUTES)
+
+                # Clamp window to activity bounds (no pre/post activity data)
+                window_start = max(window_start, start_date_local)
+                window_end = min(window_end, end_date_local)
+
+                # Truncate at next intake time so windows don't overlap
+                if fueling_index + 1 < len(fueling_list):
+                    next_fueling_datetime = start_date_local + timedelta(
+                        minutes=fueling_list[fueling_index + 1].time_during_run_min
+                    )
+                    window_end = min(window_end, next_fueling_datetime)
+
+                df_window = df_cgm.filter((pl.col("datetime") >= window_start) & (pl.col("datetime") <= window_end))
+
+                for cgm_row in df_window.iter_rows(named=True):
+                    minutes_rel = (cgm_row["datetime"] - fueling_datetime).total_seconds() / 60.0
+                    window_rows.append(
+                        {
+                            "activity_id": activity_id,
+                            "fueling_index": fueling_index,
+                            "minutes_relative": minutes_rel,
+                            "value": cgm_row["value"],
+                        }
+                    )
+
+        if not window_rows:
+            return pl.DataFrame(
+                schema={
+                    "activity_id": pl.Int64,
+                    "fueling_index": pl.Int64,
+                    "minutes_relative": pl.Float64,
+                    "value": pl.Float64,
+                }
+            )
+
+        return pl.DataFrame(window_rows)
+
+    @check_types
+    def get_fueling_impact(self) -> DataFrame[FuelingImpactSchema]:
+        df_summary = self.get_summary()
+        df_windows = self.get_fueling_glucose_windows()
+        impact_rows: list[dict[str, object]] = []
+
+        for row in df_summary.iter_rows(named=True):
+            activity_id: int = row["activity_id"]
+            start_date_local: datetime = row["start_date_local"]
+            name_date: str = row["name_date"]
+
+            questionnaire_path = self.data_paths.questionnaire / f"{activity_id}.json"
+            if not questionnaire_path.exists():
+                continue
+
+            questionnaire = self.get_questionnaire(activity_id)
+            if not questionnaire.fueling_during_run:
+                continue
+
+            for fueling_index, fueling in enumerate(questionnaire.fueling_during_run):
+                df_event = df_windows.filter(
+                    (pl.col("activity_id") == activity_id) & (pl.col("fueling_index") == fueling_index)
+                ).sort("minutes_relative")
+
+                baseline_sg = self._get_baseline_glucose(
+                    activity_id=activity_id,
+                    fueling_datetime=start_date_local + timedelta(minutes=fueling.time_during_run_min),
+                )
+
+                if df_event.drop_nulls("value").is_empty() or baseline_sg is None:
+                    impact_rows.append(
+                        {
+                            "activity_id": activity_id,
+                            "fueling_index": fueling_index,
+                            "carbohydrates_g": fueling.carbohydrates_g,
+                            "baseline_sg": baseline_sg,
+                            "peak_sg": None,
+                            "peak_increase": None,
+                            "time_to_peak_min": None,
+                            "name_date": name_date,
+                        }
+                    )
+                    continue
+
+                df_valid = df_event.drop_nulls("value")
+                peak_sg = df_valid["value"].max()
+                peak_increase = peak_sg - baseline_sg  # type: ignore[operator]
+                peak_row = df_valid.filter(pl.col("value") == peak_sg).head(1)
+                time_to_peak_min = peak_row["minutes_relative"].item()
+
+                impact_rows.append(
+                    {
+                        "activity_id": activity_id,
+                        "fueling_index": fueling_index,
+                        "carbohydrates_g": fueling.carbohydrates_g,
+                        "baseline_sg": baseline_sg,
+                        "peak_sg": peak_sg,
+                        "peak_increase": peak_increase,
+                        "time_to_peak_min": time_to_peak_min,
+                        "name_date": name_date,
+                    }
+                )
+
+        if not impact_rows:
+            return pl.DataFrame(
+                schema={
+                    "activity_id": pl.Int64,
+                    "fueling_index": pl.Int64,
+                    "carbohydrates_g": pl.Int64,
+                    "baseline_sg": pl.Float64,
+                    "peak_sg": pl.Float64,
+                    "peak_increase": pl.Float64,
+                    "time_to_peak_min": pl.Float64,
+                    "name_date": pl.Utf8,
+                }
+            )
+
+        return pl.DataFrame(impact_rows).cast(
+            {
+                "baseline_sg": pl.Float64,
+                "peak_sg": pl.Float64,
+                "peak_increase": pl.Float64,
+                "time_to_peak_min": pl.Float64,
+            }
+        )
+
+    def _get_baseline_glucose(self, *, activity_id: int, fueling_datetime: datetime) -> float | None:
+        df_cgm = (
+            pl.scan_delta(str(self.data_paths.carelink))
+            .filter((pl.col("type") == "CGM") & (pl.col("activity_id") == activity_id))
+            .select(["datetime", "value"])
+            .with_columns(pl.col("value").replace(0.0, None))
+            .collect()
+            .drop_nulls("value")
+        )
+
+        if df_cgm.is_empty():
+            return None
+
+        df_cgm = df_cgm.with_columns(
+            (pl.col("datetime") - fueling_datetime).dt.total_seconds().abs().alias("time_diff")
+        )
+        nearest = df_cgm.sort("time_diff").head(1)
+        return nearest["value"].item()  # type: ignore[return-value]
 
     def _load_summary_data(self) -> LazyFrame[StravaSummarySchema]:
         return pl.scan_delta(str(self.data_paths.strava_summary)).with_columns(

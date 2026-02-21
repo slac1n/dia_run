@@ -88,3 +88,21 @@ class PreRunNutritionSummarySchema(DataFrameModel):
     avg_bolus_percentage: Series[float] = Field(ge=0)
     in_going_sg: Series[float] = Field(gt=0)
     name_date: Series[str]
+
+
+class FuelingGlucoseWindowSchema(DataFrameModel):
+    activity_id: Series[int]
+    fueling_index: Series[int] = Field(ge=0)
+    minutes_relative: Series[float]
+    value: Series[float] = Field(nullable=True, gt=0)
+
+
+class FuelingImpactSchema(DataFrameModel):
+    activity_id: Series[int]
+    fueling_index: Series[int] = Field(ge=0)
+    carbohydrates_g: Series[int] = Field(gt=0)
+    baseline_sg: Series[float] = Field(nullable=True, gt=0)
+    peak_sg: Series[float] = Field(nullable=True, gt=0)
+    peak_increase: Series[float] = Field(nullable=True)
+    time_to_peak_min: Series[float] = Field(nullable=True)
+    name_date: Series[str]

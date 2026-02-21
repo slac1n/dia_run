@@ -108,6 +108,15 @@ def carelink_data() -> pl.DataFrame:
             value = 0.0
         data.append({"activity_id": 1002, "datetime": run_start + timedelta(minutes=i), "type": "CGM", "value": value})
 
+    # Post-activity CGM data for fueling impact testing (fueling at +15 min)
+    # Simulates glucose rise ~15 min after fueling, peaking around +90 min from start
+    for i in range(70, 140, 5):
+        if i <= 90:
+            value = 134.0 + (i - 70) * 1.5  # Rising from ~134 to ~164
+        else:
+            value = 164.0 - (i - 90) * 0.5  # Slowly dropping from peak
+        data.append({"activity_id": 1002, "datetime": run_start + timedelta(minutes=i), "type": "CGM", "value": value})
+
     # Activity 1003 - Long Run
     run_start = datetime(2025, 3, 27, 14, 0, 0)
 
@@ -128,6 +137,15 @@ def carelink_data() -> pl.DataFrame:
             value = 170.0
         else:
             value = 170.0 - ((i - 60) / 5)
+        data.append({"activity_id": 1003, "datetime": run_start + timedelta(minutes=i), "type": "CGM", "value": value})
+
+    # Post-activity CGM data for fueling impact testing (fueling at +15 and +30 min)
+    # Simulates glucose rise after fueling, peaking around +140 min from start
+    for i in range(125, 155, 5):
+        if i <= 140:
+            value = 158.0 + (i - 125) * 3.0  # Rising from ~158 to ~203
+        else:
+            value = 203.0 - (i - 140) * 2.0  # Slowly dropping from peak
         data.append({"activity_id": 1003, "datetime": run_start + timedelta(minutes=i), "type": "CGM", "value": value})
 
     return pl.DataFrame(data)
