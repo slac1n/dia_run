@@ -7,7 +7,7 @@ on:
 
 jobs:
   bump_version:
-    if: github.actor != 'github-actions[bot]'
+    if: "!contains(github.event.head_commit.message, 'commitizen-skip-ci')"
     runs-on: ubuntu-latest
     name: Bump version and create changelog with commitizen
 
