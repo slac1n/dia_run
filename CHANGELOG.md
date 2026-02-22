@@ -1,3 +1,9 @@
+## v0.13.0 (2026-02-22)
+
+### Feat
+
+- add Pydantic and Pandera validation to data fetcher (#30)
+
 ## v0.12.2 (2026-02-22)
 
 ### Fix
