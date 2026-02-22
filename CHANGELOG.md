@@ -1,3 +1,9 @@
+## v0.12.1 (2026-02-22)
+
+### Fix
+
+- prevent double execution of commitizen bump workflow (#28)
+
 ## v0.12.0 (2026-02-21)
 
 ### Feat
