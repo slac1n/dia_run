@@ -1,6 +1,7 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
+import pandera.errors as pandera_errors
 import polars as pl
 from loguru import logger
 from stravalib.client import Client
@@ -8,7 +9,9 @@ from stravalib.client import Client
 from dia_run.data_fetcher.carelink_client import CareLinkClient
 from dia_run.data_fetcher.questionnaire import RunFuelQuestionnaire
 from dia_run.data_fetcher.strava_client import get_strava_client, stream_last_activity
+from dia_run.data_models.api_responses import CareLinkResponse, StravaActivitySummary, StravaStreamData
 from dia_run.data_models.paths import DataPaths
+from dia_run.data_models.schemas import SpecificCarelinkSchema
 
 
 def run_fetcher() -> None:
@@ -40,12 +43,17 @@ class DataFetcher:
         if strava_summary_data is not None:
             logger.info("Saving strava summary data...")
             strava_summary_data.write_delta(self.STRAVA_SUMMARY_DIR, mode="append")
+        if carelink_data is not None:
+            logger.info("Validating carelink data...")
+            try:
+                SpecificCarelinkSchema.validate(carelink_data)
+            except pandera_errors.SchemaError as e:
+                raise ValueError(f"CareLink data validation failed: {e}") from e
+            logger.info("Saving carelink data...")
+            carelink_data.write_delta(self.CARELINK_DIR, mode="append")
         if strava_stream_data is not None:
             logger.info("Saving strava stream data...")
             strava_stream_data.write_delta(self.STRAVA_STREAM_DIR, mode="append")
-        if carelink_data is not None:
-            logger.info("Saving carelink data...")
-            carelink_data.write_delta(self.CARELINK_DIR, mode="append")
 
     def _get_activity_ids(self) -> list[int]:
         # Check if a Delta table exists
@@ -97,9 +105,38 @@ class DataFetcher:
         # Get detailed activity data
         da = client.get_activity(self.latest_activity_id)
 
+        # Validate Strava activity response with Pydantic
+        StravaActivitySummary(
+            id=int(da.id) if da.id is not None else 0,
+            name=str(da.name) if da.name is not None else "",
+            start_date_local=da.start_date_local if da.start_date_local is not None else datetime.now(),
+            distance=float(da.distance) if da.distance is not None else 0.0,
+            moving_time=int(da.moving_time) if da.moving_time is not None else 0,
+            elapsed_time=int(da.elapsed_time) if da.elapsed_time is not None else 0,
+            total_elevation_gain=float(da.total_elevation_gain) if da.total_elevation_gain is not None else 0.0,
+            average_heartrate=float(da.average_heartrate) if da.average_heartrate else None,
+            max_heartrate=float(da.max_heartrate) if da.max_heartrate else None,
+            average_speed=float(da.average_speed) if da.average_speed else None,
+            max_speed=float(da.max_speed) if da.max_speed else None,
+            average_watts=float(da.average_watts) if da.average_watts else None,
+            max_watts=float(da.max_watts) if da.max_watts else None,
+            kilojoules=float(da.kilojoules) if da.kilojoules else None,
+        )
+
         # Get activity streams for heart rate and power
         stream_types = ["time", "heartrate", "watts", "velocity_smooth", "moving"]
         streams = client.get_activity_streams(self.latest_activity_id, types=stream_types, series_type="time")
+
+        # Validate stream data with Pydantic
+        StravaStreamData(
+            time=list(streams["time"].data) if streams["time"].data is not None else [],
+            heartrate=list(streams["heartrate"].data) if streams["heartrate"].data is not None else [],
+            watts=list(streams["watts"].data) if streams["watts"].data is not None else [],
+            velocity_smooth=list(streams["velocity_smooth"].data)
+            if streams["velocity_smooth"].data is not None
+            else [],
+            moving=list(streams["moving"].data) if streams["moving"].data is not None else [],
+        )
 
         df_summary = pl.DataFrame(
             {
@@ -125,17 +162,20 @@ class DataFetcher:
         )
 
         # Create a range of timestamps starting from the activity start time
+        if da.start_date_local is None:
+            raise ValueError("Activity start_date_local is None")
         start_time_local = da.start_date_local
-        timestamps = [start_time_local + timedelta(seconds=i) for i in streams["time"].data]
+        time_data = streams["time"].data if streams["time"].data is not None else []
+        timestamps = [start_time_local + timedelta(seconds=i) for i in time_data]
 
         # Convert to Polars DataFrame
         df_streams = pl.DataFrame(
             {
                 "datetime": timestamps,
-                "heartrate": streams["heartrate"].data,
-                "power": streams["watts"].data,
-                "velocity": streams["velocity_smooth"].data,
-                "moving": streams["moving"].data,
+                "heartrate": streams["heartrate"].data if streams["heartrate"].data is not None else [],
+                "power": streams["watts"].data if streams["watts"].data is not None else [],
+                "velocity": streams["velocity_smooth"].data if streams["velocity_smooth"].data is not None else [],
+                "moving": streams["moving"].data if streams["moving"].data is not None else [],
             }
         ).with_columns(
             pl.col("datetime").cast(pl.Datetime),
@@ -158,6 +198,12 @@ class DataFetcher:
 
         if carelink_data is None:
             raise ValueError("Failed to get CareLink data")
+
+        # Validate CareLink API response with Pydantic
+        try:
+            CareLinkResponse(**carelink_data)
+        except Exception as e:
+            raise ValueError(f"CareLink API response validation failed: {e}") from e
 
         if self.latest_activity_id is None:
             raise ValueError("Failed to get latest activity ID. You need to get Strava data first.")
