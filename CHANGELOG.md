@@ -1,3 +1,9 @@
+## v0.12.2 (2026-02-22)
+
+### Fix
+
+- prevent double execution with correct if statement (#29)
+
 ## v0.12.1 (2026-02-22)
 
 ### Fix
