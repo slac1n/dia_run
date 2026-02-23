@@ -1,3 +1,9 @@
+## v0.14.0 (2026-02-23)
+
+### Feat
+
+- add bolus percentage vs in-going glucose scatter chart (#31)
+
 ## v0.13.0 (2026-02-22)
 
 ### Feat
