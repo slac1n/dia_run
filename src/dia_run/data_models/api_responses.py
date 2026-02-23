@@ -54,7 +54,7 @@ class CareLinkGlucoseReading(BaseModel):
 class CareLinkMarker(BaseModel):
     timestamp: str
     type: str = Field(
-        pattern="^(AUTO_BASAL_DELIVERY|INSULIN|BOLUS|MEAL_SUMMARY|EXERCISE|SMBG|AUTO_MODE_STATUS|MEAL|LOW_GLUCOSE_SUSPENDED)$"
+        pattern="^(AUTO_BASAL_DELIVERY|INSULIN|BOLUS|MEAL_SUMMARY|EXERCISE|SMBG|AUTO_MODE_STATUS|MEAL|LOW_GLUCOSE_SUSPENDED|BG_READING)$"
     )
     data: dict[str, Any]
 
