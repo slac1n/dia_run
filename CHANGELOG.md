@@ -1,3 +1,9 @@
+## v0.14.1 (2026-02-23)
+
+### Fix
+
+- add BG_READING marker type support (#32)
+
 ## v0.14.0 (2026-02-23)
 
 ### Feat
