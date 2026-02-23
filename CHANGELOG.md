@@ -1,3 +1,9 @@
+## v0.15.0 (2026-02-23)
+
+### Feat
+
+- add taiga login and auto-refresh, fix skill workflow (#33)
+
 ## v0.14.1 (2026-02-23)
 
 ### Fix
