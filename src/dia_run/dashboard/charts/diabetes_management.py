@@ -169,6 +169,88 @@ def create_pre_nutrition_impact_chart(data_processor: DataProcessor) -> go.Figur
     return fig
 
 
+def create_pre_nutrition_bolus_chart(data_processor: DataProcessor) -> go.Figure:
+    df_nutrition = data_processor.get_pre_run_nutrition_summary()
+
+    if df_nutrition.is_empty():
+        fig = go.Figure()
+        fig.update_layout(
+            title="Pre-Run Bolus Percentage vs. In-Going Sensor Glucose",
+            annotations=[
+                dict(
+                    text="No pre-run nutrition data available",
+                    xref="paper",
+                    yref="paper",
+                    x=0.5,
+                    y=0.5,
+                    showarrow=False,
+                )
+            ],
+        )
+        return fig
+
+    minutes_before_start = df_nutrition["earliest_time_before_start_min"].abs().to_numpy()
+    carbs = df_nutrition["total_carbohydrates_g"].to_numpy().astype(float)
+    bolus_percentages = df_nutrition["avg_bolus_percentage"].to_numpy().astype(float)
+    jitter = np.random.default_rng(0).uniform(-1.0, 1.0, size=bolus_percentages.shape)
+    bolus_percentages = np.clip(bolus_percentages + jitter, 0.0, 100.0)
+
+    fig = go.Figure(
+        data=[
+            go.Scatter(
+                x=bolus_percentages,
+                y=df_nutrition["in_going_sg"],
+                mode="markers",
+                marker=dict(
+                    size=10,
+                    color="MediumSeaGreen",
+                    opacity=0.4,
+                    line=dict(width=1, color="DarkSlateGrey"),
+                ),
+                hovertemplate=(
+                    "<b>%{customdata[0]}</b><br>"
+                    "Bolus: %{x:.0f}%<br>"
+                    "In-Going SG: %{y:.0f} mg/dL<br>"
+                    "Carbs: %{customdata[1]}g<br>"
+                    "Timing: %{customdata[2]} min before"
+                    "<extra></extra>"
+                ),
+                customdata=np.column_stack(
+                    [
+                        df_nutrition["name_date"].to_numpy(),
+                        carbs,
+                        minutes_before_start,
+                    ]
+                ),
+            )
+        ]
+    )
+
+    x_min = float(bolus_percentages.min()) - 5
+    x_max = float(bolus_percentages.max()) + 5
+    fig.add_shape(
+        type="rect",
+        xref="x",
+        yref="y",
+        x0=x_min,
+        y0=TARGET_GLUCOSE_LOWER,
+        x1=x_max,
+        y1=TARGET_GLUCOSE_UPPER,
+        fillcolor="LightGray",
+        opacity=0.2,
+        layer="below",
+        line_width=0,
+    )
+
+    fig.update_layout(
+        title="Pre-Run Bolus Percentage vs. In-Going Sensor Glucose",
+        xaxis_title="Bolus Percentage [%]",
+        yaxis_title="In-Going Sensor Glucose [mg/dL]",
+    )
+
+    return fig
+
+
 def create_pre_nutrition_timing_chart(data_processor: DataProcessor) -> go.Figure:
     df_nutrition = data_processor.get_pre_run_nutrition_summary()
 
