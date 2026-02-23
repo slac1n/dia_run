@@ -36,7 +36,13 @@ Confirm to the user that the status was updated.
 
 ### 3. Create the feature branch
 
-The branch name is already provided in the prompt. Create and checkout the branch:
+The branch name is already provided in the prompt. First, ensure you are on the latest `main` branch:
+
+```
+git checkout main && git pull origin main
+```
+
+Then create and checkout the feature branch:
 
 ```
 git checkout -b <branch-name>
@@ -66,7 +72,8 @@ Print a summary for the user:
 ## Important notes
 
 - The Taiga CLI (`uv run taiga`) is defined in `src/dia_run/taiga/taiga_client.py`
-- Auth token is read from `.env` as `TAIGA_AUTH_TOKEN`
+- Auth tokens are read from `.env` as `TAIGA_AUTH_TOKEN` and `TAIGA_REFRESH_TOKEN`
+- Use `uv run taiga --login` to authenticate interactively and set up these tokens
 - Project slug is read from `.env` as `TAIGA_PROJECT_SLUG` (default: `slac1n-dia-run`)
 - Branch naming convention: `feat/TG-{number}-{slugified-subject}`
 - Only user stories are supported (not issues, tasks, or epics)

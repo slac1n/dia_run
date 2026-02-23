@@ -1,10 +1,11 @@
+import getpass
 import os
 import re
 import sys
 from typing import Any
 
 import requests
-from dotenv import find_dotenv, load_dotenv
+from dotenv import find_dotenv, load_dotenv, set_key
 from loguru import logger
 
 TAIGA_API_BASE = "https://api.taiga.io/api/v1"
@@ -14,14 +15,103 @@ IN_PROGRESS_SLUG = "in-progress"
 MAX_BRANCH_SLUG_LENGTH = 50
 
 
+def _login() -> None:
+    """Interactively log in to Taiga and save tokens to .env."""
+    print("Please enter your Taiga credentials.")
+    username = input("Username or email: ")
+    password = getpass.getpass("Password: ")
+
+    url = f"{TAIGA_API_BASE}/auth"
+    payload = {
+        "type": "normal",
+        "username": username,
+        "password": password,
+    }
+
+    try:
+        response = requests.post(url, json=payload, timeout=15)
+        response.raise_for_status()
+    except requests.HTTPError as e:
+        logger.error(f"Login failed: {e}")
+        if e.response is not None and e.response.status_code == 401:
+            logger.error("Invalid credentials.")
+        sys.exit(1)
+    except requests.RequestException as e:
+        logger.error(f"Network error: {e}")
+        sys.exit(1)
+
+    data = response.json()
+    auth_token = data.get("auth_token")
+    refresh_token = data.get("refresh")
+
+    if not auth_token:
+        logger.error("No auth_token received from Taiga.")
+        sys.exit(1)
+
+    dotenv_path = find_dotenv()
+    if not dotenv_path:
+        # If no .env exists, create one in the current directory
+        dotenv_path = os.path.join(os.getcwd(), ".env")
+        with open(dotenv_path, "w") as f:
+            f.write("")
+
+    set_key(dotenv_path, "TAIGA_AUTH_TOKEN", auth_token)
+    if refresh_token:
+        set_key(dotenv_path, "TAIGA_REFRESH_TOKEN", refresh_token)
+        logger.info(f"Successfully logged in! Tokens saved to {dotenv_path}")
+    else:
+        logger.warning(f"Logged in, but no refresh token received. saved auth token to {dotenv_path}")
+
+
+def _refresh_token(*, refresh_token: str, dotenv_path: str) -> str | None:
+    """Attempt to refresh the auth token using the refresh token.
+
+    If successful, updates the .env file with the new tokens and returns the new auth token.
+    If failing, returns None.
+    """
+    url = f"{TAIGA_API_BASE}/auth/refresh"
+    payload = {"refresh": refresh_token}
+
+    try:
+        response = requests.post(url, json=payload, timeout=15)
+        response.raise_for_status()
+    except Exception as e:
+        logger.warning(f"Token refresh failed: {e}")
+        return None
+
+    data = response.json()
+    new_auth_token = data.get("auth_token")
+    new_refresh_token = data.get("refresh")
+
+    if new_auth_token and new_refresh_token:
+        set_key(dotenv_path, "TAIGA_AUTH_TOKEN", new_auth_token)
+        set_key(dotenv_path, "TAIGA_REFRESH_TOKEN", new_refresh_token)
+        logger.debug("Token refreshed and updated in .env")
+        return new_auth_token
+
+    return None
+
+
 def _get_config() -> tuple[str, str]:
-    """Load Taiga auth token and project slug from environment."""
+    """Load Taiga auth token and project slug from environment.
+
+    Proactively refreshes the token if a refresh token is present.
+    """
     dotenv_path = find_dotenv()
     load_dotenv(dotenv_path)
 
     auth_token = os.getenv("TAIGA_AUTH_TOKEN")
+    refresh_token = os.getenv("TAIGA_REFRESH_TOKEN")
+
+    if refresh_token and dotenv_path:
+        # Proactive refresh
+        new_token = _refresh_token(refresh_token=refresh_token, dotenv_path=dotenv_path)
+        if new_token:
+            auth_token = new_token
+
     if not auth_token:
         logger.error("TAIGA_AUTH_TOKEN is not set in your .env file.")
+        logger.info("Run 'uv run taiga --login' to authenticate.")
         sys.exit(1)
 
     project_slug = os.getenv("TAIGA_PROJECT_SLUG", DEFAULT_PROJECT_SLUG)
@@ -230,16 +320,17 @@ def _format_user_story(*, story: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _parse_args() -> tuple[str, bool, bool]:
+def _parse_args() -> tuple[str, bool, bool, bool]:
     """Parse CLI arguments.
 
     Returns:
-        A tuple of (tag, set_in_progress, branch_name_only).
+        A tuple of (tag, set_in_progress, branch_name_only, login).
 
     """
     args = sys.argv[1:]
     set_in_progress = False
     branch_name_only = False
+    login = False
     tag = ""
 
     for arg in args:
@@ -247,19 +338,28 @@ def _parse_args() -> tuple[str, bool, bool]:
             set_in_progress = True
         elif arg == "--branch-name":
             branch_name_only = True
+        elif arg == "--login":
+            login = True
         elif not arg.startswith("--"):
             tag = arg
 
+    if login:
+        return tag, set_in_progress, branch_name_only, login
+
     if not tag:
-        logger.error(f"Usage: taiga {TICKET_PREFIX}-<number> [--set-in-progress] [--branch-name]")
+        logger.error(f"Usage: taiga {TICKET_PREFIX}-<number> [--set-in-progress] [--branch-name] | --login")
         sys.exit(1)
 
-    return tag, set_in_progress, branch_name_only
+    return tag, set_in_progress, branch_name_only, login
 
 
 def main() -> None:
     """CLI entry point: fetch and display a Taiga user story by tag."""
-    tag, set_in_progress, branch_name_only = _parse_args()
+    tag, set_in_progress, branch_name_only, login = _parse_args()
+
+    if login:
+        _login()
+        return
 
     try:
         ref = parse_ticket_tag(tag=tag)
