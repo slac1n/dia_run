@@ -49,6 +49,11 @@ def dashboard(
             "level": "success",
             "message": message_text or "New data downloaded successfully.",
         }
+    elif fetch_status == "started":
+        flash = {
+            "level": "success",
+            "message": "Data fetch started. Check back in a few minutes for updates.",
+        }
     elif fetch_status == "error":
         flash = {
             "level": "error",

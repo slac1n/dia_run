@@ -1,7 +1,6 @@
 from typing import Annotated
-from urllib.parse import quote
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from fastapi.responses import RedirectResponse
 from loguru import logger
 
@@ -13,13 +12,19 @@ router = APIRouter()
 
 
 @router.post("/fetch")
-def fetch_new_data(*, data_paths: Annotated[DataPaths, Depends(get_data_paths)]) -> RedirectResponse:
+def _run_fetch(*, data_paths: DataPaths) -> None:
     data_fetcher = DataFetcher(data_paths=data_paths)
     try:
         data_fetcher.fetch_latest_data_and_save()
     except ValueError as exc:
         logger.error("Data fetch failed: {error}", error=str(exc))
-        message = quote(str(exc))
-        return RedirectResponse(url=f"/?fetch=error&message={message}", status_code=303)
 
-    return RedirectResponse(url="/?fetch=success", status_code=303)
+
+@router.post("/fetch")
+def fetch_new_data(
+    *,
+    background_tasks: BackgroundTasks,
+    data_paths: Annotated[DataPaths, Depends(get_data_paths)],
+) -> RedirectResponse:
+    background_tasks.add_task(_run_fetch, data_paths=data_paths)
+    return RedirectResponse(url="/?fetch=started", status_code=303)
