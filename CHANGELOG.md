@@ -1,3 +1,9 @@
+## v0.16.0 (2026-02-24)
+
+### Feat
+
+- replace Streamlit dashboard with FastAPI web app (#34)
+
 ## v0.15.0 (2026-02-23)
 
 ### Feat
