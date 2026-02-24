@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="section">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Activities</p>
+      <h1>All recorded runs</h1>
+    </div>
+    <p class="section-note">{{ activity_count }} activities available.</p>
+  </div>
+
+  {% if activities %}
+  <div class="table-card">
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Activity</th>
+            <th>Date</th>
+            <th>Distance</th>
+            <th>Time</th>
+            <th>Pace</th>
+            <th>Avg HR</th>
+            <th>Run Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for activity in activities %}
+          <tr>
+            <td>
+              <a class="table-link" href="/activities/{{ activity.activity_id }}">{{ activity.name }}</a>
+            </td>
+            <td>{{ activity.date }}</td>
+            <td>{{ activity.distance }}</td>
+            <td>{{ activity.time }}</td>
+            <td>{{ activity.pace }}</td>
+            <td>{{ activity.average_heartrate }}</td>
+            <td>{{ activity.run_type }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-card">
+    <p class="empty-state">No activities found yet. Run <code>uv run fetch</code> to pull new data.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

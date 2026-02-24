@@ -1,0 +1,257 @@
+import json
+from collections.abc import Mapping, Sequence
+from itertools import zip_longest
+from typing import Annotated, cast
+
+import polars as pl
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+from pydantic import ValidationError
+
+from dia_run.data_models.questionnaire import QuestionnaireModel
+from dia_run.data_processing.data_processing import DataProcessor
+from dia_run.web.dependencies import get_data_processor
+from dia_run.web.templates import templates
+
+router = APIRouter(prefix="/questionnaire")
+
+
+def _format_validation_errors(*, errors: Sequence[Mapping[str, object]]) -> list[str]:
+    formatted: list[str] = []
+    for error in errors:
+        loc_value = error.get("loc")
+        if isinstance(loc_value, (list, tuple)):
+            loc_parts = cast(Sequence[object], loc_value)
+            loc = " -> ".join(str(part) for part in loc_parts)
+        else:
+            loc = ""
+        msg = str(error.get("msg", "Invalid value"))
+        formatted.append(f"{loc}: {msg}" if loc else msg)
+    return formatted
+
+
+@router.get("", response_class=HTMLResponse)
+def questionnaire_list(
+    request: Request,
+    *,
+    data_processor: Annotated[DataProcessor, Depends(get_data_processor)],
+) -> HTMLResponse:
+    data_paths = data_processor.data_paths
+    data_paths.questionnaire.mkdir(parents=True, exist_ok=True)
+    df_summary = data_processor.get_summary()
+
+    existing_ids = {int(path.stem) for path in data_paths.questionnaire.glob("*.json") if path.stem.isdigit()}
+
+    if existing_ids:
+        df_unannotated = df_summary.filter(~pl.col("activity_id").is_in(list(existing_ids)))
+    else:
+        df_unannotated = df_summary
+
+    activities: list[dict[str, str | int]] = []
+    for row in df_unannotated.sort("start_date_local", descending=True).iter_rows(named=True):
+        activities.append(
+            {
+                "activity_id": row["activity_id"],
+                "name": row["name"],
+                "date": row["date"],
+                "distance": f"{row['distance_in_km']} km",
+                "run_type": str(row["run_type"]),
+            }
+        )
+
+    nav_items = [
+        {"label": "Dashboard", "href": "/"},
+        {"label": "Activities", "href": "/activities"},
+        {"label": "Questionnaire", "href": "/questionnaire"},
+    ]
+
+    return templates.TemplateResponse(
+        request,
+        "pages/questionnaire_list.html",
+        {
+            "request": request,
+            "title": "Questionnaire",
+            "nav_items": nav_items,
+            "activities": activities,
+            "activity_count": len(activities),
+        },
+    )
+
+
+@router.get("/{activity_id}", response_class=HTMLResponse)
+def questionnaire_form(
+    request: Request,
+    *,
+    activity_id: int,
+    data_processor: Annotated[DataProcessor, Depends(get_data_processor)],
+) -> HTMLResponse:
+    data_paths = data_processor.data_paths
+    df_summary = data_processor.get_summary()
+    activity_df = df_summary.filter(pl.col("activity_id") == activity_id)
+    if activity_df.is_empty():
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    row = activity_df.row(0, named=True)
+    activity = {
+        "activity_id": row["activity_id"],
+        "name": row["name"],
+        "date": row["date"],
+        "distance": f"{row['distance_in_km']} km",
+        "time": row["human_readable_time"],
+        "run_type": str(row["run_type"]),
+    }
+
+    questionnaire_path = data_paths.questionnaire / f"{activity_id}.json"
+    existing = questionnaire_path.exists()
+
+    nav_items = [
+        {"label": "Dashboard", "href": "/"},
+        {"label": "Activities", "href": "/activities"},
+        {"label": "Questionnaire", "href": "/questionnaire"},
+    ]
+
+    return templates.TemplateResponse(
+        request,
+        "pages/questionnaire_form.html",
+        {
+            "request": request,
+            "title": "Run Questionnaire",
+            "nav_items": nav_items,
+            "activity": activity,
+            "existing": existing,
+            "errors": [],
+        },
+    )
+
+
+@router.post("/{activity_id}", response_class=HTMLResponse)
+async def submit_questionnaire(
+    request: Request,
+    *,
+    activity_id: int,
+    data_processor: Annotated[DataProcessor, Depends(get_data_processor)],
+) -> HTMLResponse:
+    data_paths = data_processor.data_paths
+    data_paths.questionnaire.mkdir(parents=True, exist_ok=True)
+    df_summary = data_processor.get_summary()
+    activity_df = df_summary.filter(pl.col("activity_id") == activity_id)
+    if activity_df.is_empty():
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    row = activity_df.row(0, named=True)
+    activity = {
+        "activity_id": row["activity_id"],
+        "name": row["name"],
+        "date": row["date"],
+        "distance": f"{row['distance_in_km']} km",
+        "time": row["human_readable_time"],
+        "run_type": str(row["run_type"]),
+    }
+
+    questionnaire_path = data_paths.questionnaire / f"{activity_id}.json"
+    existing = questionnaire_path.exists()
+
+    form = await request.form()
+
+    pre_run_entries = []
+    for carbs, timing, bolus, food in zip_longest(
+        form.getlist("pre_run_carbohydrates_g"),
+        form.getlist("pre_run_time_before_start_min"),
+        form.getlist("pre_run_bolus_percentage"),
+        form.getlist("pre_run_food_type"),
+        fillvalue="",
+    ):
+        if not any([carbs, timing, bolus, food]):
+            continue
+        pre_run_entries.append(
+            {
+                "carbohydrates_g": carbs,
+                "time_before_start_min": timing,
+                "bolus_percentage": bolus,
+                "food_type": food or None,
+            }
+        )
+
+    basal_entries = []
+    for adjustment_type, start_time, end_time, basal_percentage in zip_longest(
+        form.getlist("basal_type"),
+        form.getlist("basal_start_time_min"),
+        form.getlist("basal_end_time_min"),
+        form.getlist("basal_rate_percentage"),
+        fillvalue="",
+    ):
+        if not any([adjustment_type, start_time, end_time, basal_percentage]):
+            continue
+        basal_entries.append(
+            {
+                "type": adjustment_type or None,
+                "start_time_min": start_time,
+                "end_time_min": end_time,
+                "basal_rate_percentage": basal_percentage or None,
+            }
+        )
+
+    fueling_entries = []
+    for carbs, timing, food in zip_longest(
+        form.getlist("fueling_carbohydrates_g"),
+        form.getlist("fueling_time_during_run_min"),
+        form.getlist("fueling_food_type"),
+        fillvalue="",
+    ):
+        if not any([carbs, timing, food]):
+            continue
+        fueling_entries.append(
+            {
+                "carbohydrates_g": carbs,
+                "time_during_run_min": timing,
+                "food_type": food or None,
+            }
+        )
+
+    bolus_entries = []
+    for time_of_bolus, bolus_units in zip_longest(
+        form.getlist("bolus_time_of_bolus_min"),
+        form.getlist("bolus_units"),
+        fillvalue="",
+    ):
+        if not any([time_of_bolus, bolus_units]):
+            continue
+        bolus_entries.append(
+            {
+                "time_of_bolus_min": time_of_bolus,
+                "bolus_units": bolus_units,
+            }
+        )
+
+    try:
+        questionnaire = QuestionnaireModel(
+            pre_run=pre_run_entries,
+            basal_adjustments=basal_entries,
+            fueling_during_run=fueling_entries,
+            bolus=bolus_entries,
+        )
+    except ValidationError as exc:
+        errors = _format_validation_errors(errors=cast(Sequence[Mapping[str, object]], exc.errors()))
+        nav_items = [
+            {"label": "Dashboard", "href": "/"},
+            {"label": "Activities", "href": "/activities"},
+            {"label": "Questionnaire", "href": "/questionnaire"},
+        ]
+        return templates.TemplateResponse(
+            request,
+            "pages/questionnaire_form.html",
+            {
+                "request": request,
+                "title": "Run Questionnaire",
+                "nav_items": nav_items,
+                "activity": activity,
+                "existing": existing,
+                "errors": errors,
+            },
+            status_code=422,
+        )
+
+    with open(questionnaire_path, "w") as f:
+        json.dump(questionnaire.model_dump(mode="json"), f, indent=2)
+
+    return RedirectResponse(url=f"/activities/{activity_id}", status_code=303)

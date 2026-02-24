@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="section detail-header">
+  <a class="back-link" href="/questionnaire">Back to questionnaire list</a>
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Run questionnaire</p>
+      <h1>{{ activity.name }}</h1>
+    </div>
+    <p class="section-note">{{ activity.date }} | {{ activity.distance }} | {{ activity.run_type }}</p>
+  </div>
+</section>
+
+{% if existing %}
+<div class="warning-card">
+  <p>Questionnaire already exists. Submitting will overwrite the current file.</p>
+</div>
+{% endif %}
+
+{% if errors %}
+<div class="error-card">
+  <h3>Form errors</h3>
+  <ul class="error-list">
+    {% for error in errors %}
+    <li>{{ error }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<form class="form-card" method="post">
+  <section class="form-section">
+    <div class="form-header">
+      <h3>Pre-run nutrition</h3>
+      <p class="form-note">Add up to three entries. Use negative minutes for pre-run timing.</p>
+    </div>
+    {% for _ in range(3) %}
+    <div class="form-row">
+      <div class="field-group">
+        <label>Carbs (g)</label>
+        <input type="number" name="pre_run_carbohydrates_g" min="0" step="1" placeholder="30" />
+      </div>
+      <div class="field-group">
+        <label>Minutes before start</label>
+        <input type="number" name="pre_run_time_before_start_min" max="0" step="1" placeholder="-30" />
+      </div>
+      <div class="field-group">
+        <label>Bolus (%)</label>
+        <input type="number" name="pre_run_bolus_percentage" min="0" max="100" step="1" placeholder="70" />
+      </div>
+      <div class="field-group">
+        <label>Food type</label>
+        <input type="text" name="pre_run_food_type" placeholder="Energy bar" />
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="form-section">
+    <div class="form-header">
+      <h3>Basal adjustments</h3>
+      <p class="form-note">Optional. Use negative minutes for adjustments before the run.</p>
+    </div>
+    {% for _ in range(3) %}
+    <div class="form-row">
+      <div class="field-group">
+        <label>Type</label>
+        <select name="basal_type">
+          <option value="">Select</option>
+          <option value="Temporal SmartGuard">Temporal SmartGuard</option>
+          <option value="Temporal Basalrate">Temporal Basalrate</option>
+          <option value="Stop Pump">Stop Pump</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label>Start time (min)</label>
+        <input type="number" name="basal_start_time_min" step="1" placeholder="-10" />
+      </div>
+      <div class="field-group">
+        <label>End time (min)</label>
+        <input type="number" name="basal_end_time_min" step="1" placeholder="60" />
+      </div>
+      <div class="field-group">
+        <label>Basal rate (%)</label>
+        <input type="number" name="basal_rate_percentage" min="0" step="1" placeholder="20" />
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="form-section">
+    <div class="form-header">
+      <h3>Fueling during run</h3>
+      <p class="form-note">Add up to three entries. Minutes are relative to run start.</p>
+    </div>
+    {% for _ in range(3) %}
+    <div class="form-row form-row--three">
+      <div class="field-group">
+        <label>Carbs (g)</label>
+        <input type="number" name="fueling_carbohydrates_g" min="0" step="1" placeholder="15" />
+      </div>
+      <div class="field-group">
+        <label>Minutes in</label>
+        <input type="number" name="fueling_time_during_run_min" min="0" step="1" placeholder="20" />
+      </div>
+      <div class="field-group">
+        <label>Food type</label>
+        <input type="text" name="fueling_food_type" placeholder="Energy gel" />
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="form-section">
+    <div class="form-header">
+      <h3>Manual bolus</h3>
+      <p class="form-note">Optional. Use minutes relative to run start.</p>
+    </div>
+    {% for _ in range(3) %}
+    <div class="form-row form-row--two">
+      <div class="field-group">
+        <label>Time of bolus (min)</label>
+        <input type="number" name="bolus_time_of_bolus_min" step="1" placeholder="20" />
+      </div>
+      <div class="field-group">
+        <label>Bolus units</label>
+        <input type="number" name="bolus_units" min="0" step="0.1" placeholder="0.5" />
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+
+  <div class="form-actions">
+    <button class="button" type="submit">Save questionnaire</button>
+    <a class="button button-outline" href="/activities/{{ activity.activity_id }}">View activity</a>
+  </div>
+</form>
+{% endblock %}

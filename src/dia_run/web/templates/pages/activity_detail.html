@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="section detail-header">
+  <a class="back-link" href="/activities">Back to activities</a>
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Activity</p>
+      <h1>{{ activity.name }}</h1>
+    </div>
+    <p class="section-note">{{ activity.date }} | {{ activity.run_type }}</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="info-grid">
+    <div class="info-card">
+      <p class="info-label">Distance</p>
+      <p class="info-value">{{ activity.distance }}</p>
+    </div>
+    <div class="info-card">
+      <p class="info-label">Time</p>
+      <p class="info-value">{{ activity.time }}</p>
+    </div>
+    <div class="info-card">
+      <p class="info-label">Pace</p>
+      <p class="info-value">{{ activity.pace }}</p>
+    </div>
+    <div class="info-card">
+      <p class="info-label">Avg HR</p>
+      <p class="info-value">{{ activity.average_heartrate }}</p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="chart-card chart-card--full">
+    <h3>Glucose and insulin timeline</h3>
+    <div class="chart-embed">{{ chart }}</div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="detail-grid">
+    <div class="list-card">
+      <h3>Pre-run nutrition</h3>
+      {% if pre_run %}
+      <ul class="detail-list">
+        {% for entry in pre_run %}
+        <li class="detail-item">
+          <span>{{ entry.carbohydrates_g }}g carbs</span>
+          <span>{{ entry.food_type }}</span>
+          <span>{{ entry.time_before_start_min }} min before</span>
+          <span>{{ entry.bolus_percentage }}% bolus</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="empty-state">No pre-run nutrition recorded.</p>
+      {% endif %}
+    </div>
+    <div class="list-card">
+      <h3>Fueling during run</h3>
+      {% if fueling %}
+      <ul class="detail-list">
+        {% for entry in fueling %}
+        <li class="detail-item">
+          <span>{{ entry.carbohydrates_g }}g carbs</span>
+          <span>{{ entry.food_type }}</span>
+          <span>{{ entry.time_during_run_min }} min in</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="empty-state">No fueling recorded.</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}
