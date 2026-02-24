@@ -108,7 +108,10 @@ class DataProcessor:
         )
 
     def get_questionnaire(self, activity_id: int) -> QuestionnaireModel:
-        with open(self.data_paths.questionnaire / f"{activity_id}.json") as f:
+        questionnaire_path = self.data_paths.questionnaire / f"{activity_id}.json"
+        if not questionnaire_path.exists():
+            return QuestionnaireModel()
+        with open(questionnaire_path) as f:
             data = json.load(f)
         return QuestionnaireModel.model_validate(data)
 

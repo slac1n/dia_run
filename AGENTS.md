@@ -5,12 +5,12 @@ Guidelines for AI coding agents working in this repository.
 ## Project Overview
 
 Python application for analyzing diabetes management during running activities.
-Integrates Strava (running data) and CareLink (CGM/insulin data) with a Streamlit dashboard.
+Integrates Strava (running data) and CareLink (CGM/insulin data) with a FastAPI web app (Jinja2 + Plotly).
 
 - **Python:** >=3.12, <3.13
 - **Package manager:** uv (lockfile: `uv.lock`)
 - **Build system:** Hatchling
-- **Architecture:** `data_fetcher` (API clients) -> `data_models` (schemas/enums/paths) -> `data_processing` (business logic) -> `dashboard` (Streamlit + Plotly)
+- **Architecture:** `data_fetcher` (API clients) -> `data_models` (schemas/enums/paths) -> `data_processing` (business logic) -> `dashboard` (Plotly chart functions) + `web` (FastAPI + Jinja2)
 
 ## Build & Run Commands
 
@@ -27,8 +27,11 @@ uv run pre-commit run --all-files
 # Run the data fetcher CLI
 uv run fetch
 
-# Run the Streamlit dashboard
-uv run streamlit run src/dia_run/dashboard/app.py
+# Run the FastAPI web app
+uv run uvicorn dia_run.web.app:app --reload
+
+# Run via Docker Compose
+docker compose up --build
 
 # Linting
 uv run ruff check src/ tests/
@@ -163,9 +166,13 @@ src/dia_run/
     calendar.py          # Calendar model
   data_processing/       # Business logic
     data_processing.py   # DataProcessor class (central data pipeline)
-  dashboard/             # Streamlit UI
-    app.py               # Dashboard entry point
+  dashboard/             # Plotly chart functions (pure functions)
     charts/              # Plotly chart functions (pure functions)
+  web/                   # FastAPI web app (Jinja2 templates)
+    app.py               # FastAPI app entry point
+    routes/              # FastAPI routes
+    templates/           # Jinja2 templates
+    static/              # CSS and static assets
 tests/
   conftest.py            # Session-scoped fixtures with Delta Lake test data
   test_data_processing/  # Tests for data processing logic

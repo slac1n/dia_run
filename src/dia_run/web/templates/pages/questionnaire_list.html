@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="section">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Questionnaire</p>
+      <h1>Annotate new activities</h1>
+    </div>
+    <p class="section-note">{{ activity_count }} activities need notes.</p>
+  </div>
+
+  {% if activities %}
+  <div class="table-card">
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Activity</th>
+            <th>Date</th>
+            <th>Distance</th>
+            <th>Run Type</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for activity in activities %}
+          <tr>
+            <td>{{ activity.name }}</td>
+            <td>{{ activity.date }}</td>
+            <td>{{ activity.distance }}</td>
+            <td>{{ activity.run_type }}</td>
+            <td>
+              <a class="table-link" href="/questionnaire/{{ activity.activity_id }}">Start</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-card">
+    <p class="empty-state">All activities are annotated. You are up to date.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

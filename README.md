@@ -36,10 +36,29 @@ To get your latest data:
 **Note**: Right now, it only pulls the most recent Strava workout and the last 24 hours of Carelink data.
 This means that you should track your runs right after your workout.
 
-Start the dashboard by running:
+### Web UI
+Start the FastAPI app:
 ```bash
-uv run streamlit run src/dia_run/dashboard/app.py
+uv run uvicorn dia_run.web.app:app --reload
 ```
+
+Open http://localhost:8000
+
+Key pages:
+- Dashboard: `/`
+- Activities: `/activities`
+- Questionnaire: `/questionnaire`
+
+Use the "Download new data" button on the dashboard to trigger the fetch workflow.
+
+### Docker
+```bash
+docker compose up --build
+```
+
+Open http://localhost:8000
+
+Ensure `.env` and `logindata.json` exist locally so the container can authenticate with Strava and CareLink.
 
 ## AWS Backup
 ```
