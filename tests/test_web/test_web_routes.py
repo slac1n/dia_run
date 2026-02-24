@@ -68,7 +68,7 @@ def test_dashboard_route(*, client: TestClient) -> None:
 
 def test_questionnaire_submission(*, client: TestClient, web_data_paths: DataPaths) -> None:
     questionnaire_path = web_data_paths.questionnaire / "1002.json"
-    questionnaire_path.unlink()
+    questionnaire_path.unlink(missing_ok=True)
 
     response = client.post(
         "/questionnaire/1002",
