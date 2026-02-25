@@ -1,6 +1,7 @@
 from typing import Annotated
 from urllib.parse import unquote
 
+import polars as pl
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 
@@ -40,6 +41,7 @@ def dashboard(
 ) -> HTMLResponse:
     df_summary = data_processor.get_summary()
     kpis = data_processor.get_30_day_kpis()
+    data_paths = data_processor.data_paths
 
     fetch_status = request.query_params.get("fetch")
     message_param = request.query_params.get("message")
@@ -61,6 +63,13 @@ def dashboard(
         }
     else:
         flash = None
+
+    data_paths.questionnaire.mkdir(parents=True, exist_ok=True)
+    existing_ids = {int(path.stem) for path in data_paths.questionnaire.glob("*.json") if path.stem.isdigit()}
+    if existing_ids:
+        pending_count = len(df_summary.filter(~pl.col("activity_id").is_in(list(existing_ids))))
+    else:
+        pending_count = len(df_summary)
 
     kpi_cards = [
         {"label": "Total Distance", "value": f"{kpis.total_distance_km:.1f} km"},
@@ -138,5 +147,6 @@ def dashboard(
             "kpi_cards": kpi_cards,
             "flash": flash,
             "charts": charts,
+            "pending_questionnaires": pending_count,
         },
     )

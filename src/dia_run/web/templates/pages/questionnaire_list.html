@@ -2,6 +2,12 @@
 
 {% block content %}
 <section class="section">
+  {% if flash %}
+  <div class="flash flash-{{ flash.level }}">
+    <p>{{ flash.message }}</p>
+  </div>
+  {% endif %}
+
   <div class="section-header">
     <div>
       <p class="eyebrow">Questionnaire</p>

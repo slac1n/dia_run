@@ -65,6 +65,25 @@ def questionnaire_list(
         {"label": "Questionnaire", "href": "/questionnaire"},
     ]
 
+    fetch_status = request.query_params.get("fetch")
+    if fetch_status == "started":
+        flash = {
+            "level": "info",
+            "message": "Data fetch started. New activities will appear below when ready.",
+        }
+    elif fetch_status == "success":
+        flash = {
+            "level": "success",
+            "message": "New data downloaded! Please fill out the questionnaire for your new run(s).",
+        }
+    elif fetch_status == "error":
+        flash = {
+            "level": "error",
+            "message": "Data fetch failed. Check the logs for details.",
+        }
+    else:
+        flash = None
+
     return templates.TemplateResponse(
         request,
         "pages/questionnaire_list.html",
@@ -74,6 +93,7 @@ def questionnaire_list(
             "nav_items": nav_items,
             "activities": activities,
             "activity_count": len(activities),
+            "flash": flash,
         },
     )
 

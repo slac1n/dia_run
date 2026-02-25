@@ -7,6 +7,11 @@
     <p>{{ flash.message }}</p>
   </div>
   {% endif %}
+  {% if pending_questionnaires > 0 %}
+  <div class="flash flash-warning">
+    <p>You have {{ pending_questionnaires }} activit{{ 'y' if pending_questionnaires == 1 else 'ies' }} waiting for <a href="/questionnaire" class="inline-link">questionnaire input</a>.</p>
+  </div>
+  {% endif %}
   <div class="section-header">
     <div>
       <p class="eyebrow">Last 30 days</p>
