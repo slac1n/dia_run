@@ -23,15 +23,37 @@ class TestDataProcessor:
         result = processor.get_summary()
 
         SummarySchema.validate(result)
-        assert len(result) == 3
-        assert set(result["activity_id"].to_list()) == {1001, 1002, 1003}
+        assert len(result) == 4
+        assert set(result["activity_id"].to_list()) == {1001, 1002, 1003, 1004}
 
         assert result.filter(pl.col("activity_id") == 1001)["distance"].item() == 5000
         assert result.filter(pl.col("activity_id") == 1002)["distance"].item() == 8000
         assert result.filter(pl.col("activity_id") == 1003)["distance"].item() == 20_000
+        assert result.filter(pl.col("activity_id") == 1004)["distance"].item() == 42195
         assert result.filter(pl.col("activity_id") == 1001)["run_type"].item() == RunType.EASY
         assert result.filter(pl.col("activity_id") == 1002)["run_type"].item() == RunType.INTERVAL
         assert result.filter(pl.col("activity_id") == 1003)["run_type"].item() == RunType.LONG
+        assert result.filter(pl.col("activity_id") == 1004)["run_type"].item() == RunType.RACE
+
+        # Verify human_readable_time has proper zero-padding (H:MM format)
+        # Activity 1001: 1800 seconds = 0:30 -> "0:30"
+        assert result.filter(pl.col("activity_id") == 1001)["human_readable_time"].item() == "0:30"
+        # Activity 1002: 3600 seconds = 1:00 -> "1:00"
+        assert result.filter(pl.col("activity_id") == 1002)["human_readable_time"].item() == "1:00"
+        # Activity 1003: 7200 seconds = 2:00 -> "2:00"
+        assert result.filter(pl.col("activity_id") == 1003)["human_readable_time"].item() == "2:00"
+        # Activity 1004: 9000 seconds = 2:30 -> "2:30"
+        assert result.filter(pl.col("activity_id") == 1004)["human_readable_time"].item() == "2:30"
+
+        # Verify human_readable_pace has proper zero-padding (M:SS format)
+        # Activity 1001: 5.5 min/km = 5:30 -> "5:30"
+        assert result.filter(pl.col("activity_id") == 1001)["human_readable_pace"].item() == "5:30"
+        # Activity 1002: 5.13 min/km = 5:08 -> "5:08" (tests leading zero in seconds)
+        assert result.filter(pl.col("activity_id") == 1002)["human_readable_pace"].item() == "5:08"
+        # Activity 1003: 6.0 min/km = 6:00 -> "6:00"
+        assert result.filter(pl.col("activity_id") == 1003)["human_readable_pace"].item() == "6:00"
+        # Activity 1004: 6.17 min/km = 6:10 -> "6:10"
+        assert result.filter(pl.col("activity_id") == 1004)["human_readable_pace"].item() == "6:10"
 
     def test_get_specific_carelink(self, test_data_paths: DataPaths) -> None:
         processor = DataProcessor(test_data_paths)
@@ -86,7 +108,7 @@ class TestDataProcessor:
         result = processor.get_heartrate_streams()
 
         HeartrateStreamsSchema.validate(result)
-        assert set(result["run_type"].to_list()) == {RunType.EASY, RunType.INTERVAL, RunType.LONG}
+        assert set(result["run_type"].to_list()) == {RunType.EASY, RunType.INTERVAL, RunType.LONG, RunType.RACE}
 
         easy_hrs = result.filter(pl.col("run_type") == RunType.EASY)["heartrate"]
         interval_hrs = result.filter(pl.col("run_type") == RunType.INTERVAL)["heartrate"]
@@ -103,11 +125,14 @@ class TestDataProcessor:
         start_datetime_3 = datetime(2025, 3, 27, 14, 0, 0)
         duration_3 = timedelta(minutes=120)
 
+        start_datetime_4 = datetime(2025, 3, 28, 8, 0, 0)
+        duration_4 = timedelta(minutes=150)
+
         processor = DataProcessor(test_data_paths)
         result = processor.get_glucose_streams()
 
         GlucoseStreamsSchema.validate(result)
-        assert set(result["run_type"].to_list()) == {RunType.EASY, RunType.INTERVAL, RunType.LONG}
+        assert set(result["run_type"].to_list()) == {RunType.EASY, RunType.INTERVAL, RunType.LONG, RunType.RACE}
 
         easy_gs = result.filter(pl.col("run_type") == RunType.EASY)["value"]
         interval_gs = result.filter(pl.col("run_type") == RunType.INTERVAL)["value"]
@@ -118,6 +143,7 @@ class TestDataProcessor:
             ((pl.col("run_type") == RunType.EASY), start_datetime_1, duration_1),
             ((pl.col("run_type") == RunType.INTERVAL), start_datetime_2, duration_2),
             ((pl.col("run_type") == RunType.LONG), start_datetime_3, duration_3),
+            ((pl.col("run_type") == RunType.RACE), start_datetime_4, duration_4),
         ]:
             # Should only include data from 5 minutes before start to 5 minutes after end
             result_run_type = result.filter(run_type_exp)
@@ -135,7 +161,7 @@ class TestDataProcessor:
 
         # Activity 1001 has no pre-run nutrition -> excluded
         assert 1001 not in result["activity_id"].to_list()
-        assert len(result) == 2
+        assert len(result) == 3
 
         # Activity 1002: 30g carbs, -30 min, 70% bolus
         row_1002 = result.filter(pl.col("activity_id") == 1002)
@@ -152,6 +178,14 @@ class TestDataProcessor:
         assert row_1003["avg_bolus_percentage"].item() == 80.0
         assert row_1003["in_going_sg"].item() is not None
         assert row_1003["in_going_sg"].item() > 0
+
+        # Activity 1004: 60g carbs, -120 min, 60% bolus
+        row_1004 = result.filter(pl.col("activity_id") == 1004)
+        assert row_1004["total_carbohydrates_g"].item() == 60
+        assert row_1004["earliest_time_before_start_min"].item() == -120
+        assert row_1004["avg_bolus_percentage"].item() == 60.0
+        assert row_1004["in_going_sg"].item() is not None
+        assert row_1004["in_going_sg"].item() > 0
 
     def test_get_pre_run_nutrition_summary_empty(self, test_data_paths: DataPaths) -> None:
         empty_questionnaire_dir = test_data_paths.questionnaire.parent / "empty_questionnaires"
@@ -181,16 +215,16 @@ class TestDataProcessor:
 class TestKpis:
     def test_get_30_day_kpis(self, test_data_paths: DataPaths) -> None:
         processor = DataProcessor(test_data_paths)
-        # All 3 test activities are on March 25-27, 2025
+        # All 4 test activities are on March 25-28, 2025
         result = processor.get_30_day_kpis(reference_date=datetime(2025, 3, 28))
 
         assert isinstance(result, KpiModel)
 
-        # Total distance: (5000 + 8000 + 20000) / 1000 = 33.0 km
-        assert result.total_distance_km == 33.0
+        # Total distance: (5000 + 8000 + 20000 + 42195) / 1000 = 75.195 km -> 75.2 km
+        assert result.total_distance_km == 75.2
 
-        # Total running time: (1800 + 3600 + 7200) / 60 = 210 minutes
-        assert result.total_running_time_minutes == 210
+        # Total running time: (1800 + 3600 + 7200 + 9000) / 60 = 360 minutes
+        assert result.total_running_time_minutes == 360
 
         # Avg sensor glucose should be present and positive
         assert result.avg_sensor_glucose is not None
@@ -213,12 +247,12 @@ class TestKpis:
 
     def test_kpi_model_formatted_running_time(self) -> None:
         kpis = KpiModel(
-            total_distance_km=33.0,
-            total_running_time_minutes=210,
+            total_distance_km=75.2,
+            total_running_time_minutes=360,
             avg_sensor_glucose=150.0,
             time_in_range_percentage=66.7,
         )
-        assert kpis.formatted_running_time == "3h 30m"
+        assert kpis.formatted_running_time == "6h 0m"
 
         kpis_zero = KpiModel(
             total_distance_km=0.0,
@@ -317,8 +351,8 @@ class TestFuelingImpact:
         # Activity 1001 has no fueling -> excluded
         assert 1001 not in result["activity_id"].to_list()
 
-        # Should have 3 fueling events total: 1 from 1002, 2 from 1003
-        assert len(result) == 3
+        # Should have 5 fueling events total: 1 from 1002, 2 from 1003, 2 from 1004
+        assert len(result) == 5
 
     def test_get_fueling_impact_activity_1002(self, test_data_paths: DataPaths) -> None:
         processor = DataProcessor(test_data_paths)

@@ -8,6 +8,7 @@ class RunType(StrEnum):
     INTERVAL = "Interval"
     TEMPO = "Tempo Run"
     LONG = "Long Run"
+    RACE = "Race"
     OTHER = "Other"
 
     @classmethod
@@ -18,6 +19,12 @@ class RunType(StrEnum):
             cls.INTERVAL: "Interval",
             cls.TEMPO: "Tempo",
             cls.LONG: "Long",
+            cls.RACE: None,  # Race is detected via regex pattern
             cls.OTHER: None,
         }
         return keywords_map.get(run_type)
+
+    @classmethod
+    def get_race_pattern(cls) -> str:
+        """Get regex pattern for detecting race keywords in run names."""
+        return r"(?i)\b(half[- ]?marathon|halbmarathon|marathon)\b"

@@ -33,26 +33,27 @@ def test_data_paths(tmp_path_factory: pytest.TempPathFactory) -> DataPaths:
 def strava_summary_data() -> pl.DataFrame:
     return pl.DataFrame(
         {
-            "activity_id": [1001, 1002, 1003],
-            "name": ["Easy Run 5k", "Interval 8k", "Long Run 20k"],
+            "activity_id": [1001, 1002, 1003, 1004],
+            "name": ["Easy Run 5k", "Interval 8k", "Long Run 20k", "Berlin Marathon"],
             "start_date_local": [
                 datetime(2025, 3, 25, 10, 0, 0),
                 datetime(2025, 3, 26, 18, 0, 0),
                 datetime(2025, 3, 27, 14, 0, 0),
+                datetime(2025, 3, 28, 8, 0, 0),
             ],
-            "distance": [5000.0, 8000.0, 20000.0],
-            "moving_time": [1800, 3600, 7200],
-            "elapsed_time": [1800, 3600, 7200],
-            "total_elevation_gain": [50.0, 100.0, 200.0],
-            "average_heartrate": [145.0, 165.0, 152.0],
-            "max_heartrate": [160, 180, 165],
-            "average_speed": [2.8, 2.2, 2.5],
-            "max_speed": [3.0, 4.0, 3.0],
-            "average_watts": [150.0, 200.0, 175.0],
-            "max_watts": [200, 250, 225],
-            "kilojoules": [500.0, 800.0, 1000.0],
-            "average_pace": [5.5, 4.5, 6.0],
-            "max_pace": [5.0, 4.0, 5.5],
+            "distance": [5000.0, 8000.0, 20000.0, 42195.0],
+            "moving_time": [1800, 3600, 7200, 9000],
+            "elapsed_time": [1800, 3600, 7200, 9000],
+            "total_elevation_gain": [50.0, 100.0, 200.0, 150.0],
+            "average_heartrate": [145.0, 165.0, 152.0, 155.0],
+            "max_heartrate": [160, 180, 165, 175],
+            "average_speed": [2.8, 2.2, 2.5, 2.7],
+            "max_speed": [3.0, 4.0, 3.0, 3.5],
+            "average_watts": [150.0, 200.0, 175.0, 180.0],
+            "max_watts": [200, 250, 225, 240],
+            "kilojoules": [500.0, 800.0, 1000.0, 1200.0],
+            "average_pace": [5.5, 5.13, 6.0, 6.17],  # 5:30, 5:08, 6:00, 6:10
+            "max_pace": [5.0, 4.0, 5.5, 4.5],
         }
     )
 
@@ -148,6 +149,30 @@ def carelink_data() -> pl.DataFrame:
             value = 203.0 - (i - 140) * 2.0  # Slowly dropping from peak
         data.append({"activity_id": 1003, "datetime": run_start + timedelta(minutes=i), "type": "CGM", "value": value})
 
+    # Activity 1004 - Berlin Marathon (Race)
+    run_start = datetime(2025, 3, 28, 8, 0, 0)
+
+    # Pre-run data (insulin)
+    for i in range(activity_start_delta, 0, 5):
+        data.append(
+            {
+                "activity_id": 1004,
+                "datetime": run_start + timedelta(minutes=i),
+                "type": "INSULIN" if i == -180 else "AUTO_BASAL_DELIVERY",
+                "value": 3.0 if i == -180 else 0.25,
+            }
+        )
+
+    # During run data (CGM)
+    for i in range(activity_start_delta, 155, 5):
+        if i < 60:
+            value = 160.0
+        elif i < 120:
+            value = 155.0
+        else:
+            value = 165.0
+        data.append({"activity_id": 1004, "datetime": run_start + timedelta(minutes=i), "type": "CGM", "value": value})
+
     return pl.DataFrame(data)
 
 
@@ -183,6 +208,17 @@ def strava_stream_data() -> pl.DataFrame:
                 "datetime": run_start + timedelta(minutes=i),
                 "activity_id": 1003,
                 "heartrate": 150 + i % 15,
+            }
+        )
+
+    # Activity 1004 - Berlin Marathon (Race)
+    run_start = datetime(2025, 3, 28, 8, 0, 0)
+    for i in range(0, 150):
+        data.append(
+            {
+                "datetime": run_start + timedelta(minutes=i),
+                "activity_id": 1004,
+                "heartrate": 155 + i % 20,
             }
         )
 
@@ -232,6 +268,24 @@ def questionnaire_data() -> dict[int, dict]:
             "fueling_during_run": [
                 {"carbohydrates_g": 20, "time_during_run_min": 15, "food_type": "Energy Gel"},
                 {"carbohydrates_g": 25, "time_during_run_min": 30, "food_type": "Sports Drink"},
+            ],
+            "bolus": [],
+        },
+        1004: {
+            "pre_run": [
+                {
+                    "carbohydrates_g": 60,
+                    "time_before_start_min": -120,
+                    "food_type": "Pasta",
+                    "bolus_percentage": 60.0,
+                }
+            ],
+            "basal_adjustments": [
+                {"type": "Temp Basal", "start_time_min": -30, "end_time_min": 150, "basal_rate_percentage": 30.0}
+            ],
+            "fueling_during_run": [
+                {"carbohydrates_g": 25, "time_during_run_min": 45, "food_type": "Energy Gel"},
+                {"carbohydrates_g": 25, "time_during_run_min": 90, "food_type": "Energy Gel"},
             ],
             "bolus": [],
         },
