@@ -11,8 +11,7 @@ from dia_run.web.dependencies import get_data_paths
 router = APIRouter()
 
 
-@router.post("/fetch")
-def _run_fetch(*, data_paths: DataPaths) -> None:
+def _fetch_data_task(*, data_paths: DataPaths) -> None:
     data_fetcher = DataFetcher(data_paths=data_paths)
     try:
         data_fetcher.fetch_latest_data_and_save()
@@ -26,5 +25,5 @@ def fetch_new_data(
     background_tasks: BackgroundTasks,
     data_paths: Annotated[DataPaths, Depends(get_data_paths)],
 ) -> RedirectResponse:
-    background_tasks.add_task(_run_fetch, data_paths=data_paths)
-    return RedirectResponse(url="/?fetch=started", status_code=303)
+    background_tasks.add_task(_fetch_data_task, data_paths=data_paths)
+    return RedirectResponse(url="/questionnaire?fetch=started", status_code=303)
