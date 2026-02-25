@@ -84,7 +84,7 @@ def dashboard(
         },
     ]
 
-    run_type_order = [RunType.EASY, RunType.INTERVAL, RunType.TEMPO, RunType.LONG]
+    run_type_order = [RunType.EASY, RunType.INTERVAL, RunType.TEMPO, RunType.LONG, RunType.RACE]
 
     charts = {
         "activity_calendar": render_plotly_figure(

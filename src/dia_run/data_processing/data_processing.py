@@ -365,12 +365,14 @@ class DataProcessor:
             pl.format(
                 "{}:{}",
                 (pl.col("elapsed_time") // 3600),  # Hours
-                (pl.col("elapsed_time") % 3600) // 60,  # Minutes
+                ((pl.col("elapsed_time") % 3600) // 60).cast(pl.Utf8).str.zfill(2),  # Minutes with zero-padding
             ).alias("human_readable_time"),
             pl.format(
                 "{}:{}",
                 (pl.col("average_pace").floor().cast(int)),  # Minutes
-                ((pl.col("average_pace") % 1) * 60).round(0).cast(int),  # Fractional minutes to seconds
+                (((pl.col("average_pace") % 1) * 60).round(0).cast(int))
+                .cast(pl.Utf8)
+                .str.zfill(2),  # Seconds with zero-padding
             ).alias("human_readable_pace"),
             pl.format(
                 "{}",
@@ -391,6 +393,8 @@ class DataProcessor:
             .then(pl.lit(RunType.TEMPO))
             .when(pl.col("name").str.contains(RunType.get_keyword(RunType.LONG)))
             .then(pl.lit(RunType.LONG))
+            .when(pl.col("name").str.contains(RunType.get_race_pattern()))
+            .then(pl.lit(RunType.RACE))
             .otherwise(pl.lit(RunType.OTHER))
             .alias("run_type"),
         )
