@@ -1,3 +1,9 @@
+## v0.16.1 (2026-02-25)
+
+### Fix
+
+- **web**: improve fetch flow and questionnaire integration (#35)
+
 ## v0.16.0 (2026-02-24)
 
 ### Feat
