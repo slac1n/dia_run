@@ -1,3 +1,9 @@
+## v0.17.0 (2026-02-25)
+
+### Feat
+
+- add Race run type with marathon/halbmarathon detection (#36)
+
 ## v0.16.1 (2026-02-25)
 
 ### Fix
