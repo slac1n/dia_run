@@ -94,7 +94,7 @@ def dashboard(
             figure=create_activity_calendar_chart(df_summary),
         ),
         "run_type_pie": render_plotly_figure(
-            figure=create_run_type_pie_chart(data_processor),
+            figure=create_run_type_pie_chart(data_processor=data_processor, run_type_order=run_type_order),
         ),
         "run_type_distance": render_plotly_figure(
             figure=create_run_type_distance_chart(data_processor=data_processor, run_type_order=run_type_order),

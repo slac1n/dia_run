@@ -2,6 +2,15 @@ import numpy as np
 import plotly.graph_objects as go
 import polars as pl
 
+from dia_run.dashboard.charts.theme import (
+    COLOR_MUTED,
+    MAIN_COLOR_SHADE_500,
+    NAVY,
+    SANDY,
+    TOMATO,
+    get_default_layout,
+    get_empty_chart_layout,
+)
 from dia_run.data_processing.data_processing import DataProcessor
 
 
@@ -55,17 +64,10 @@ def create_fueling_glucose_response_chart(*, data_processor: DataProcessor) -> g
     if df_windows.is_empty():
         fig = go.Figure()
         fig.update_layout(
-            title="Glucose Response After Fueling",
-            annotations=[
-                dict(
-                    text="No fueling data available",
-                    xref="paper",
-                    yref="paper",
-                    x=0.5,
-                    y=0.5,
-                    showarrow=False,
-                )
-            ],
+            **get_empty_chart_layout(
+                title="Glucose Response After Fueling",
+                message="No fueling data available",
+            )
         )
         return fig
 
@@ -105,7 +107,7 @@ def create_fueling_glucose_response_chart(*, data_processor: DataProcessor) -> g
                 y=values,
                 mode="lines",
                 showlegend=False,
-                line=dict(width=1, dash="dash", color="rgba(99, 110, 250, 0.35)"),
+                line=dict(width=1, dash="dash", color="rgba(13, 59, 102, 0.35)"),
                 hovertemplate="Min: %{x:.0f}<br>Change: %{y:+.0f} mg/dL<extra></extra>",
             )
         )
@@ -128,7 +130,7 @@ def create_fueling_glucose_response_chart(*, data_processor: DataProcessor) -> g
                 mode="lines",
                 name="Mean Response",
                 showlegend=False,
-                line=dict(color="white", width=3),
+                line=dict(color=NAVY, width=3),
                 hovertemplate="Min: %{x:.0f}<br>Mean Change: %{y:+.0f} mg/dL<extra></extra>",
             )
         )
@@ -149,7 +151,7 @@ def create_fueling_glucose_response_chart(*, data_processor: DataProcessor) -> g
                 fig.add_vline(
                     x=lowest_point_minute,
                     line_dash="dot",
-                    line_color="#FF4136",
+                    line_color=TOMATO,
                     line_width=2,
                     annotation_text=f"Lowest: +{lowest_point_minute} min",
                     annotation_position="top right",
@@ -166,23 +168,26 @@ def create_fueling_glucose_response_chart(*, data_processor: DataProcessor) -> g
                 fig.add_vline(
                     x=return_to_baseline_minute,
                     line_dash="dot",
-                    line_color="#2ECC40",
+                    line_color=MAIN_COLOR_SHADE_500,
                     line_width=2,
                     annotation_text=f"Baseline: +{return_to_baseline_minute} min",
                     annotation_position="top right",
                 )
 
-    fig.add_vline(x=0, line_dash="dash", line_color="orange", line_width=2, annotation_text="Intake")
+    fig.add_vline(x=0, line_dash="dash", line_color=SANDY, line_width=2, annotation_text="Intake")
 
     fig.update_layout(
-        title="Glucose Response After Fueling",
-        xaxis_title="Minutes Relative to Fueling",
-        yaxis_title="Glucose Change [mg/dL]",
-        showlegend=False,
-        xaxis=dict(
-            range=[-DataProcessor.PRE_INTAKE_WINDOW_MINUTES, DataProcessor.FUELING_WINDOW_MINUTES],
-            autorange=False,
+        **get_default_layout(
+            title="Glucose Response After Fueling",
+            xaxis_title="Minutes Relative to Fueling",
+            yaxis_title="Glucose Change [mg/dL]",
+            showlegend=False,
         ),
+    )
+    fig.update_xaxes(
+        range=[-DataProcessor.PRE_INTAKE_WINDOW_MINUTES, DataProcessor.FUELING_WINDOW_MINUTES],
+        autorange=False,
+        tickfont={"color": COLOR_MUTED},
     )
 
     return fig
@@ -196,17 +201,10 @@ def create_fueling_carbs_vs_peak_chart(*, data_processor: DataProcessor) -> go.F
     if df_valid.is_empty():
         fig = go.Figure()
         fig.update_layout(
-            title="Carbohydrate Intake vs. Peak Glucose Increase",
-            annotations=[
-                dict(
-                    text="No fueling impact data available",
-                    xref="paper",
-                    yref="paper",
-                    x=0.5,
-                    y=0.5,
-                    showarrow=False,
-                )
-            ],
+            **get_empty_chart_layout(
+                title="Carbohydrate Intake vs. Peak Glucose Increase",
+                message="No fueling impact data available",
+            )
         )
         return fig
 
@@ -225,9 +223,9 @@ def create_fueling_carbs_vs_peak_chart(*, data_processor: DataProcessor) -> go.F
             mode="markers",
             marker=dict(
                 size=12,
-                color="MediumSeaGreen",
-                opacity=0.4,
-                line=dict(width=1, color="DarkSlateGrey"),
+                color=MAIN_COLOR_SHADE_500,
+                opacity=0.6,
+                line=dict(width=1, color=NAVY),
             ),
             hovertemplate=(
                 "<b>%{customdata[0]}</b><br>"
@@ -249,9 +247,11 @@ def create_fueling_carbs_vs_peak_chart(*, data_processor: DataProcessor) -> go.F
     )
 
     fig.update_layout(
-        title="Carbohydrate Intake vs. Peak Glucose Increase",
-        xaxis_title="Carbohydrates [g]",
-        yaxis_title="Peak Glucose Increase [mg/dL]",
+        **get_default_layout(
+            title="Carbohydrate Intake vs. Peak Glucose Increase",
+            xaxis_title="Carbohydrates [g]",
+            yaxis_title="Peak Glucose Increase [mg/dL]",
+        )
     )
 
     return fig
