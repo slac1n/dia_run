@@ -441,3 +441,77 @@ class TestFuelingImpact:
             "time_to_peak_min",
             "name_date",
         }
+
+
+class TestBasalAdjustmentTir:
+    def test_get_basal_adjustment_tir(self, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        result = processor.get_basal_adjustment_tir()
+
+        from dia_run.data_models.schemas import BasalAdjustmentTirSchema
+
+        BasalAdjustmentTirSchema.validate(result)
+
+        # Activity 1001 has no basal adjustments
+        assert 1001 not in result["activity_id"].to_list()
+
+        # Activity 1002 has 2 basal adjustments in questionnaire, but:
+        # - Adjustment 0 (SmartGuard): start=-10, end=60 -> clipped to [0,60] = 60 min duration
+        # - Adjustment 1 (Basalrate): start=60, end=120 -> clipped to [60,60] = 0 min duration (excluded)
+        # So only 1 adjustment is returned
+        adjustments_1002 = result.filter(pl.col("activity_id") == 1002)
+        assert len(adjustments_1002) == 1
+
+        # Check the valid adjustment (index 0)
+        adj_row = adjustments_1002.row(0, named=True)
+        assert adj_row["adjustment_index"] == 0
+        assert adj_row["type"] == "Temporal SmartGuard"
+        assert adj_row["basal_rate_percentage"] is None  # SmartGuard doesn't have percentage
+        assert adj_row["duration_min"] == 60
+        assert 0 <= adj_row["tir_pct"] <= 100
+        assert adj_row["n_points"] > 0
+        assert adj_row["covered_minutes"] > 0
+
+    def test_get_basal_adjustment_tir_activity_1002(self, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        result = processor.get_basal_adjustment_tir()
+
+        # Activity 1002 has adjustments with CGM data
+        adj_1002 = result.filter(pl.col("activity_id") == 1002)
+
+        # Check durations and CGM coverage
+        for row in adj_1002.iter_rows(named=True):
+            assert row["duration_min"] > 0
+            assert row["n_points"] > 0
+            assert row["covered_minutes"] > 0
+            assert row["tir_pct"] is not None
+            assert 0 <= row["tir_pct"] <= 100
+
+    def test_get_basal_adjustment_tir_empty(self, test_data_paths: DataPaths) -> None:
+        empty_questionnaire_dir = test_data_paths.questionnaire.parent / "empty_questionnaires_basal"
+        empty_questionnaire_dir.mkdir(parents=True, exist_ok=True)
+
+        empty_paths = DataPaths(
+            carelink=test_data_paths.carelink,
+            strava_summary=test_data_paths.strava_summary,
+            strava_stream=test_data_paths.strava_stream,
+            questionnaire=empty_questionnaire_dir,
+        )
+        processor = DataProcessor(empty_paths)
+        result = processor.get_basal_adjustment_tir()
+
+        from dia_run.data_models.schemas import BasalAdjustmentTirSchema
+
+        BasalAdjustmentTirSchema.validate(result)
+        assert result.is_empty()
+        assert set(result.columns) == {
+            "activity_id",
+            "adjustment_index",
+            "type",
+            "basal_rate_percentage",
+            "duration_min",
+            "tir_pct",
+            "n_points",
+            "covered_minutes",
+            "name_date",
+        }

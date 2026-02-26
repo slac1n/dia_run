@@ -107,6 +107,18 @@ class FuelingGlucoseWindowSchema(DataFrameModel):
     value: Series[float] = Field(nullable=True, gt=0)
 
 
+class BasalAdjustmentTirSchema(DataFrameModel):
+    activity_id: Series[int]
+    adjustment_index: Series[int] = Field(ge=0)
+    type: Series[str]
+    basal_rate_percentage: Series[float] = Field(nullable=True, ge=0)
+    duration_min: Series[int] = Field(gt=0)
+    tir_pct: Series[float] = Field(ge=0, le=100)
+    n_points: Series[int] = Field(ge=0)
+    covered_minutes: Series[float] = Field(ge=0)
+    name_date: Series[str]
+
+
 class FuelingImpactSchema(DataFrameModel):
     activity_id: Series[int]
     fueling_index: Series[int] = Field(ge=0)
