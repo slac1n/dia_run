@@ -14,6 +14,7 @@ from dia_run.data_models.run_types import RunType
 from dia_run.data_models.schemas import (
     AggregatedGlucoseSchema,
     AggregateInsulinOnBoard,
+    BasalAdjustmentTirSchema,
     BaseGlucoseStreamSchema,
     FuelingGlucoseWindowSchema,
     FuelingImpactSchema,
@@ -340,6 +341,102 @@ class DataProcessor:
                 "time_to_peak_min": pl.Float64,
             }
         )
+
+    @check_types
+    def get_basal_adjustment_tir(self) -> DataFrame[BasalAdjustmentTirSchema]:
+        df_summary = self.get_summary()
+        tir_rows: list[dict[str, object]] = []
+
+        for row in df_summary.iter_rows(named=True):
+            activity_id: int = row["activity_id"]
+            start_date_local: datetime = row["start_date_local"]
+            end_date_local: datetime = row["end_date_local"]
+            name_date: str = row["name_date"]
+
+            questionnaire_path = self.data_paths.questionnaire / f"{activity_id}.json"
+            if not questionnaire_path.exists():
+                continue
+
+            questionnaire = self.get_questionnaire(activity_id)
+            if not questionnaire.basal_adjustments:
+                continue
+
+            df_cgm = (
+                pl.scan_delta(str(self.data_paths.carelink))
+                .filter((pl.col("type") == "CGM") & (pl.col("activity_id") == activity_id))
+                .select(["datetime", "value"])
+                .with_columns(pl.col("value").replace(0.0, None))
+                .sort("datetime")
+                .collect()
+                .drop_nulls("value")
+            )
+
+            if df_cgm.is_empty():
+                continue
+
+            adjustment_list = questionnaire.basal_adjustments
+            for adjustment_index, adj in enumerate(adjustment_list):
+                adjustment_start = start_date_local + timedelta(minutes=adj.start_time_min)
+                adjustment_end = start_date_local + timedelta(minutes=adj.end_time_min)
+
+                adjustment_start = max(adjustment_start, start_date_local)
+                adjustment_end = min(adjustment_end, end_date_local)
+
+                if adjustment_end <= adjustment_start:
+                    continue
+
+                duration_min = int((adjustment_end - adjustment_start).total_seconds() / 60)
+                if duration_min <= 0:
+                    continue
+
+                df_interval = df_cgm.filter(
+                    (pl.col("datetime") >= adjustment_start) & (pl.col("datetime") <= adjustment_end)
+                )
+
+                n_points = len(df_interval)
+                if n_points == 0:
+                    # Skip adjustments with no CGM coverage
+                    continue
+
+                points_in_range = len(
+                    df_interval.filter(
+                        (pl.col("value") >= TARGET_GLUCOSE_LOWER) & (pl.col("value") <= TARGET_GLUCOSE_UPPER)
+                    )
+                )
+
+                tir_pct = round((points_in_range / n_points) * 100, 1) if n_points > 0 else 0.0
+                covered_minutes = float(duration_min)
+
+                tir_rows.append(
+                    {
+                        "activity_id": activity_id,
+                        "adjustment_index": adjustment_index,
+                        "type": adj.type,
+                        "basal_rate_percentage": adj.basal_rate_percentage,
+                        "duration_min": duration_min,
+                        "tir_pct": tir_pct,
+                        "n_points": n_points,
+                        "covered_minutes": covered_minutes,
+                        "name_date": name_date,
+                    }
+                )
+
+        if not tir_rows:
+            return pl.DataFrame(
+                schema={
+                    "activity_id": pl.Int64,
+                    "adjustment_index": pl.Int64,
+                    "type": pl.Utf8,
+                    "basal_rate_percentage": pl.Float64,
+                    "duration_min": pl.Int64,
+                    "tir_pct": pl.Float64,
+                    "n_points": pl.Int64,
+                    "covered_minutes": pl.Float64,
+                    "name_date": pl.Utf8,
+                }
+            )
+
+        return pl.DataFrame(tir_rows)
 
     def _get_baseline_glucose(self, *, activity_id: int, fueling_datetime: datetime) -> float | None:
         df_cgm = (

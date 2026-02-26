@@ -6,6 +6,9 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 
 from dia_run.dashboard.charts.activity_calendar import create_activity_calendar_chart
+from dia_run.dashboard.charts.basal_adjustment_impact import (
+    create_basal_adjustment_tir_chart,
+)
 from dia_run.dashboard.charts.diabetes_management import (
     create_in_going_out_going_sensor_glucose_chart,
     create_insulin_on_board_and_normalized_glucose_change_chart,
@@ -125,6 +128,9 @@ def dashboard(
         ),
         "fueling_carbs_peak": render_plotly_figure(
             figure=create_fueling_carbs_vs_peak_chart(data_processor=data_processor),
+        ),
+        "basal_adjustment_tir": render_plotly_figure(
+            figure=create_basal_adjustment_tir_chart(data_processor=data_processor),
         ),
     }
 
