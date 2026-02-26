@@ -1,3 +1,9 @@
+## v0.18.0 (2026-02-26)
+
+### Feat
+
+- **TG-24**: add point-count TIR calculation for basal adjustments (#37)
+
 ## v0.17.0 (2026-02-25)
 
 ### Feat
