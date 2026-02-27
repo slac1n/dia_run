@@ -3,18 +3,25 @@ from datetime import date, datetime, timedelta
 import plotly.graph_objects as go
 import polars as pl
 
+from dia_run.dashboard.charts.theme import (
+    CHART_BG,
+    CHART_PAPER_BG,
+    COLOR_MUTED,
+    MAIN_COLOR,
+    MAIN_COLOR_SHADE_300,
+    MAIN_COLOR_SHADE_500,
+    NO_ACTIVITY_COLOR,
+)
 from dia_run.data_models.calendar import Calendar, CalendarWeek
 
 WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 ACTIVITY_COLOR_SCALE = [
-    [0, "#161b22"],  # 0km (no activity)
-    [0.001, "#0e4429"],  # >0 to 5km
-    [0.25, "#006d32"],  # 5km to 10km
-    [0.5, "#26a641"],  # 10km to 15km
-    [0.75, "#2ea043"],  # 15km to 20km
-    [1, "#39d353"],  # 20km+
+    [0.0, NO_ACTIVITY_COLOR],
+    [0.001, MAIN_COLOR_SHADE_300],
+    [0.5, MAIN_COLOR_SHADE_500],
+    [1.0, MAIN_COLOR],
 ]
 
 
@@ -106,17 +113,15 @@ def _calculate_month_positions(start_date: datetime) -> dict[str, int]:
 
 def _update_figure_layout(*, fig: go.Figure, current_year: int, month_positions: dict[str, int]) -> None:
     fig.update_layout(
-        paper_bgcolor="#0d1117",
-        plot_bgcolor="#0d1117",
+        meta={"card_title": f"Running Distance Calendar {current_year}"},
+        paper_bgcolor=CHART_PAPER_BG,
+        plot_bgcolor=CHART_BG,
         font=dict(
-            color="#7d8590",
+            color=COLOR_MUTED,
             size=12,
         ),
-        title=dict(
-            text=f"Running Distance Calendar {current_year}",
-        ),
         height=180,
-        margin=dict(l=50, r=10, t=40, b=20),
+        margin=dict(l=50, r=10, t=20, b=20),
         xaxis=dict(
             showgrid=False,
             showline=False,

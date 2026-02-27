@@ -2,6 +2,12 @@ import numpy as np
 import plotly.graph_objects as go
 import polars as pl
 
+from dia_run.dashboard.charts.theme import (
+    CHART_GRID,
+    MAIN_COLOR,
+    get_default_layout,
+    get_empty_chart_layout,
+)
 from dia_run.data_processing.data_processing import DataProcessor
 
 
@@ -26,18 +32,10 @@ def create_basal_adjustment_tir_chart(*, data_processor: DataProcessor) -> go.Fi
     if df_tir.is_empty():
         fig = go.Figure()
         fig.update_layout(
-            annotations=[
-                dict(
-                    text="No basal adjustment data available",
-                    xref="paper",
-                    yref="paper",
-                    x=0.5,
-                    y=0.5,
-                    showarrow=False,
-                )
-            ],
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
+            **get_empty_chart_layout(
+                title="Basal Adjustment vs Time in Range",
+                message="No basal adjustment data available",
+            )
         )
         return fig
 
@@ -47,18 +45,10 @@ def create_basal_adjustment_tir_chart(*, data_processor: DataProcessor) -> go.Fi
     if df_valid.is_empty():
         fig = go.Figure()
         fig.update_layout(
-            annotations=[
-                dict(
-                    text="Insufficient CGM coverage for basal adjustments",
-                    xref="paper",
-                    yref="paper",
-                    x=0.5,
-                    y=0.5,
-                    showarrow=False,
-                )
-            ],
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
+            **get_empty_chart_layout(
+                title="Basal Adjustment vs Time in Range",
+                message="Insufficient CGM coverage for basal adjustments",
+            )
         )
         return fig
 
@@ -85,36 +75,10 @@ def create_basal_adjustment_tir_chart(*, data_processor: DataProcessor) -> go.Fi
 
     sorted_buckets = sorted(buckets, key=sort_key)
 
-    color_map = {
-        "Pump Suspended": "#ff4136",
-        "SmartGuard": "#1f77b4",
-        "10%": "#d62728",
-        "15%": "#2ca02c",
-        "20%": "#9467bd",
-        "25%": "#ff7f0e",
-        "30%": "#8c564b",
-        "35%": "#e377c2",
-        "40%": "#7f7f7f",
-        "45%": "#17becf",
-        "50%": "#bcbd22",
-        "55%": "#aec7e8",
-        "60%": "#ff9896",
-        "65%": "#98df8a",
-        "70%": "#c5b0d5",
-        "75%": "#ffbb78",
-        "80%": "#c49c94",
-        "85%": "#f7b6d2",
-        "90%": "#c7c7c7",
-        "95%": "#9edae5",
-        "100%": "#dbdb8d",
-        "N/A": "#636363",
-    }
-
     fig = go.Figure()
 
     for bucket in sorted_buckets:
         df_bucket = df_valid.filter(pl.col("pct_bucket") == bucket)
-        color = color_map.get(bucket, "#1f77b4")
 
         fig.add_trace(
             go.Box(
@@ -123,18 +87,13 @@ def create_basal_adjustment_tir_chart(*, data_processor: DataProcessor) -> go.Fi
                 name=bucket,
                 legendgroup=bucket,
                 showlegend=False,
-                boxpoints="all",
-                jitter=0.3,
-                pointpos=0,
                 marker=dict(
                     size=12,
-                    color=color,
+                    color=MAIN_COLOR,
                     opacity=0.8,
-                    line=dict(width=1.5, color="white"),
+                    line=dict(width=1.5, color=MAIN_COLOR),
                 ),
-                line=dict(color="rgba(0,0,0,0.7)", width=2.5),
-                fillcolor=color,
-                opacity=0.5,
+                line=dict(color=MAIN_COLOR, width=2.0),
                 width=0.7,
                 hovertemplate=(
                     "<b>%{customdata[4]}</b><br>"
@@ -158,14 +117,14 @@ def create_basal_adjustment_tir_chart(*, data_processor: DataProcessor) -> go.Fi
             )
         )
 
-    fig.update_layout(
-        yaxis_title="Time in Range [%]",
+    layout = get_default_layout(
+        title="Basal Adjustment vs Time in Range",
         xaxis_title="Basal Rate Bucket",
+        yaxis_title="Time in Range [%]",
         height=450,
-        margin=dict(l=60, r=30, t=30, b=80),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
     )
+    layout["margin"] = {"l": 60, "r": 30, "t": 50, "b": 80}
+    fig.update_layout(**layout)
 
     fig.update_xaxes(
         categoryorder="array",
@@ -175,8 +134,8 @@ def create_basal_adjustment_tir_chart(*, data_processor: DataProcessor) -> go.Fi
     )
     fig.update_yaxes(
         range=[0, 105],
-        gridcolor="rgba(0,0,0,0.1)",
-        zerolinecolor="rgba(0,0,0,0.2)",
+        gridcolor=CHART_GRID,
+        zerolinecolor=CHART_GRID,
         showgrid=True,
     )
 

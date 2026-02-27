@@ -94,7 +94,7 @@ def dashboard(
             figure=create_activity_calendar_chart(df_summary),
         ),
         "run_type_pie": render_plotly_figure(
-            figure=create_run_type_pie_chart(data_processor),
+            figure=create_run_type_pie_chart(data_processor=data_processor, run_type_order=run_type_order),
         ),
         "run_type_distance": render_plotly_figure(
             figure=create_run_type_distance_chart(data_processor=data_processor, run_type_order=run_type_order),
@@ -106,7 +106,7 @@ def dashboard(
             figure=create_run_type_glucose_chart(data_processor=data_processor, run_type_order=run_type_order),
         ),
         "in_out_sg": render_plotly_figure(
-            figure=create_in_going_out_going_sensor_glucose_chart(data_processor),
+            figure=create_in_going_out_going_sensor_glucose_chart(data_processor=data_processor),
         ),
         "iob_norm_change": render_plotly_figure(
             figure=create_insulin_on_board_and_normalized_glucose_change_chart(data_processor),

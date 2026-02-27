@@ -4,6 +4,15 @@ import plotly.graph_objects as go
 import polars as pl
 from plotly.subplots import make_subplots
 
+from dia_run.dashboard.charts.theme import (
+    COLOR_SUCCESS,
+    GOLD,
+    NAVY,
+    SANDY,
+    TARGET_RANGE_FILL,
+    TOMATO,
+    get_default_layout,
+)
 from dia_run.data_models.constants import TARGET_GLUCOSE_LOWER, TARGET_GLUCOSE_UPPER
 from dia_run.data_processing.data_processing import DataProcessor
 
@@ -31,6 +40,7 @@ def create_single_activity_carelink_chart(*, data_processor: DataProcessor, acti
             y=sel_df_carelink_cgm["value"],
             name="Sensor Glucose",
             mode="lines",
+            line=dict(color=NAVY),
         ),
         secondary_y=False,
     )
@@ -42,6 +52,7 @@ def create_single_activity_carelink_chart(*, data_processor: DataProcessor, acti
                 x=sel_df_carelink_basal["datetime"],
                 y=sel_df_carelink_basal["value"],
                 name="Basal Insulin",
+                marker=dict(color=GOLD),
             ),
             secondary_y=True,
         )
@@ -57,12 +68,27 @@ def create_single_activity_carelink_chart(*, data_processor: DataProcessor, acti
                 x=sel_df_carelink_bolus["datetime"],
                 y=sel_df_carelink_bolus["value"],
                 name="Bolus Insulin",
+                marker=dict(color=SANDY),
             ),
             secondary_y=True,
         )
 
-    _add_vertical_line(fig=fig, datetime_instance=start_datetime, color="green", name="Start")
-    _add_vertical_line(fig=fig, datetime_instance=end_datetime, color="red", name="End")
+    _add_vertical_line(
+        fig=fig,
+        datetime_instance=start_datetime,
+        color=COLOR_SUCCESS,
+        name="Start",
+        dash="solid",
+        width=2.4,
+    )
+    _add_vertical_line(
+        fig=fig,
+        datetime_instance=end_datetime,
+        color=TOMATO,
+        name="End",
+        dash="longdash",
+        width=2.4,
+    )
 
     fig.add_shape(
         type="rect",
@@ -72,8 +98,8 @@ def create_single_activity_carelink_chart(*, data_processor: DataProcessor, acti
         y0=TARGET_GLUCOSE_LOWER,
         x1=end_datetime,
         y1=TARGET_GLUCOSE_UPPER,
-        fillcolor="LightGray",
-        opacity=0.2,
+        fillcolor=TARGET_RANGE_FILL,
+        opacity=0.3,
         layer="below",
         line_width=0,
     )
@@ -81,26 +107,59 @@ def create_single_activity_carelink_chart(*, data_processor: DataProcessor, acti
     if questionnaire.pre_run:
         for prerun in questionnaire.pre_run:
             prerun_time = start_datetime + timedelta(minutes=prerun.time_before_start_min)
-            _add_vertical_line(fig=fig, datetime_instance=prerun_time, color="orange", name="Pre-Run Nutrition")
+            _add_vertical_line(
+                fig=fig,
+                datetime_instance=prerun_time,
+                color=SANDY,
+                name="Pre-Run Nutrition",
+                dash="dash",
+                width=2.0,
+                opacity=0.9,
+            )
 
     if questionnaire.fueling_during_run:
         for fuel_instance, fuel in enumerate(questionnaire.fueling_during_run):
             fuel_time_diff = fuel.time_during_run_min
             fuel_time = start_datetime + timedelta(minutes=fuel_time_diff)
             _add_vertical_line(
-                fig=fig, datetime_instance=fuel_time, color="blue", name=f"Fueling {int(fuel_instance) + 1}"
+                fig=fig,
+                datetime_instance=fuel_time,
+                color=NAVY,
+                name=f"Fueling {int(fuel_instance) + 1}",
+                dash="dot",
+                width=1.8,
+                opacity=0.85,
             )
+
+    fig.update_layout(
+        **get_default_layout(
+            title="Single Activity CareLink Overview",
+            xaxis_title="Time",
+            yaxis_title="Sensor Glucose [mg/dl]",
+            showlegend=True,
+        )
+    )
 
     return fig
 
 
-def _add_vertical_line(*, fig: go.Figure, datetime_instance: datetime, color: str, name: str) -> None:
+def _add_vertical_line(
+    *,
+    fig: go.Figure,
+    datetime_instance: datetime,
+    color: str,
+    name: str,
+    dash: str = "dash",
+    width: float = 1.5,
+    opacity: float = 1.0,
+) -> None:
     fig.add_trace(
         go.Scatter(
             x=[datetime_instance, datetime_instance],
             y=[70, 250],
             mode="lines",
             name=name,
-            line=dict(color=color, width=1, dash="dash"),
+            line=dict(color=color, width=width, dash=dash),
+            opacity=opacity,
         )
     )
