@@ -24,14 +24,11 @@ NO_ACTIVITY_COLOR = "#e5e7eb"
 
 # Extended palette for charts
 CHART_COLORS = [
-    NAVY,
-    GOLD,
-    SANDY,
-    TOMATO,
-    ASH_GREY,
     CHARCOAL_BLUE,
-    DEEP_TEAL,
     MUTED_TEAL,
+    DEEP_TEAL,
+    DARK_SLATE_GREY,
+    ASH_GREY,
 ]
 
 # Semantic colors

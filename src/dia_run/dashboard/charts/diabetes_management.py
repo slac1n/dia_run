@@ -18,7 +18,7 @@ from dia_run.data_models.constants import TARGET_GLUCOSE_LOWER, TARGET_GLUCOSE_U
 from dia_run.data_processing.data_processing import DataProcessor
 
 
-def create_in_going_out_going_sensor_glucose_chart(data_processor: DataProcessor) -> px.scatter:
+def create_in_going_out_going_sensor_glucose_chart(*, data_processor: DataProcessor) -> px.scatter:
     df_summary = data_processor.get_summary()
     df_summary = df_summary.drop_nulls(subset=["in_going_sg", "out_going_sg"]).with_columns(
         pl.concat_list("insulin_on_board_in_going", "insulin_on_board_in_going", None).alias("line_x"),
