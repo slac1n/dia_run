@@ -1,3 +1,9 @@
+## v0.19.0 (2026-02-27)
+
+### Feat
+
+- **TG-32**: establish and implement consistent frontend color theme (#38)
+
 ## v0.18.0 (2026-02-26)
 
 ### Feat
