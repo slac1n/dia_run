@@ -107,7 +107,7 @@ def create_fueling_glucose_response_chart(*, data_processor: DataProcessor) -> g
                 y=values,
                 mode="lines",
                 showlegend=False,
-                line=dict(width=1, dash="dash", color="rgba(13, 59, 102, 0.35)"),
+                line=dict(width=1, dash="dash", color="rgba(47, 62, 70, 0.35)"),
                 hovertemplate="Min: %{x:.0f}<br>Change: %{y:+.0f} mg/dL<extra></extra>",
             )
         )

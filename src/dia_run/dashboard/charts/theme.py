@@ -3,16 +3,23 @@
 from typing import Any
 
 # Palette colors
-NAVY = "#0d3b66"
-CHIFFON = "#faf0ca"
-GOLD = "#f4d35e"
-SANDY = "#ee964b"
-TOMATO = "#f95738"
+ASH_GREY = "#cad2c5"
+MUTED_TEAL = "#84a98c"
+DEEP_TEAL = "#52796f"
+DARK_SLATE_GREY = "#354f52"
+CHARCOAL_BLUE = "#2f3e46"
+
+# Legacy aliases kept for compatibility across chart modules
+NAVY = CHARCOAL_BLUE
+CHIFFON = ASH_GREY
+GOLD = MUTED_TEAL
+SANDY = DEEP_TEAL
+TOMATO = DARK_SLATE_GREY
 
 # Primary chart color shades
 MAIN_COLOR = NAVY
-MAIN_COLOR_SHADE_500 = "#4b79a7"
-MAIN_COLOR_SHADE_300 = "#c6d8ea"
+MAIN_COLOR_SHADE_500 = DEEP_TEAL
+MAIN_COLOR_SHADE_300 = MUTED_TEAL
 NO_ACTIVITY_COLOR = "#e5e7eb"
 
 # Extended palette for charts
@@ -21,23 +28,23 @@ CHART_COLORS = [
     GOLD,
     SANDY,
     TOMATO,
-    "#5a8a9a",  # Muted teal for variety
-    "#8a6a5a",  # Muted brown
-    "#4a7a6a",  # Muted green
-    "#7a5a8a",  # Muted purple
+    ASH_GREY,
+    CHARCOAL_BLUE,
+    DEEP_TEAL,
+    MUTED_TEAL,
 ]
 
 # Semantic colors
-COLOR_SUCCESS = "#2d8a5e"
+COLOR_SUCCESS = MUTED_TEAL
 COLOR_WARNING = SANDY
 COLOR_ERROR = TOMATO
-COLOR_MUTED = "#6a7a8a"
+COLOR_MUTED = DEEP_TEAL
 
 # Chart element colors
 CHART_BG = "#ffffff"
-CHART_GRID = "rgba(13, 59, 102, 0.1)"
+CHART_GRID = "rgba(47, 62, 70, 0.12)"
 CHART_PAPER_BG = "#ffffff"
-TARGET_RANGE_FILL = "rgba(13, 59, 102, 0.1)"
+TARGET_RANGE_FILL = "rgba(47, 62, 70, 0.1)"
 
 
 def get_default_layout(

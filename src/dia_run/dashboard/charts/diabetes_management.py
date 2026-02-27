@@ -4,13 +4,13 @@ import plotly.graph_objects as go
 import polars as pl
 
 from dia_run.dashboard.charts.theme import (
+    ASH_GREY,
     COLOR_MUTED,
     MAIN_COLOR,
     MAIN_COLOR_SHADE_300,
     MAIN_COLOR_SHADE_500,
     NAVY,
     TARGET_RANGE_FILL,
-    TOMATO,
     get_default_layout,
     get_empty_chart_layout,
 )
@@ -39,7 +39,7 @@ def create_in_going_out_going_sensor_glucose_chart(data_processor: DataProcessor
                 y=df_summary["in_going_sg"],
                 mode="markers",
                 name="Start",
-                marker=dict(color=MAIN_COLOR_SHADE_500, size=10),
+                marker=dict(color=MAIN_COLOR_SHADE_300, size=11, line={"width": 1, "color": NAVY}),
                 hovertext=df_summary["name_date"],
                 hoverinfo="text",
             ),
@@ -48,7 +48,7 @@ def create_in_going_out_going_sensor_glucose_chart(data_processor: DataProcessor
                 y=df_summary["out_going_sg"],
                 mode="markers",
                 name="End",
-                marker=dict(color=TOMATO, size=10),
+                marker=dict(color=MAIN_COLOR, size=11, line={"width": 1, "color": MAIN_COLOR_SHADE_300}),
                 hovertext=df_summary["name_date"],
                 hoverinfo="text",
             ),
@@ -390,11 +390,31 @@ def create_pre_nutrition_heatmap(data_processor: DataProcessor) -> go.Figure:
     z_min = min(flat_values)
     z_max = max(flat_values)
 
-    colorscale: list[list[float | str]] = [
-        [0.0, MAIN_COLOR_SHADE_300],
-        [0.5, MAIN_COLOR_SHADE_500],
-        [1.0, MAIN_COLOR],
-    ]
+    if z_max == z_min:
+        colorscale: list[list[float | str]] = [
+            [0.0, MAIN_COLOR],
+            [1.0, MAIN_COLOR],
+        ]
+    else:
+        low_target_pos = float((TARGET_GLUCOSE_LOWER - z_min) / (z_max - z_min))
+        high_target_pos = float((TARGET_GLUCOSE_UPPER - z_min) / (z_max - z_min))
+
+        low_target_pos = min(1.0, max(0.0, low_target_pos))
+        high_target_pos = min(1.0, max(0.0, high_target_pos))
+        low_target_pos, high_target_pos = sorted((low_target_pos, high_target_pos))
+
+        if low_target_pos == high_target_pos:
+            high_target_pos = min(1.0, low_target_pos + 0.01)
+
+        target_mid_pos = (low_target_pos + high_target_pos) / 2
+
+        colorscale = [
+            [0.0, ASH_GREY],
+            [low_target_pos, MAIN_COLOR_SHADE_500],
+            [target_mid_pos, MAIN_COLOR],
+            [high_target_pos, MAIN_COLOR_SHADE_500],
+            [1.0, ASH_GREY],
+        ]
 
     fig = go.Figure(
         data=go.Heatmap(

@@ -2,11 +2,18 @@
   color-scheme: light;
 
   /* Palette */
-  --color-navy: #0d3b66;
-  --color-chiffon: #faf0ca;
-  --color-gold: #f4d35e;
-  --color-sandy: #ee964b;
-  --color-tomato: #f95738;
+  --ash-grey: #cad2c5;
+  --muted-teal: #84a98c;
+  --deep-teal: #52796f;
+  --dark-slate-grey: #354f52;
+  --charcoal-blue: #2f3e46;
+
+  /* Legacy aliases used throughout the stylesheet */
+  --color-navy: var(--charcoal-blue);
+  --color-chiffon: var(--ash-grey);
+  --color-gold: var(--muted-teal);
+  --color-sandy: var(--deep-teal);
+  --color-tomato: var(--dark-slate-grey);
 
   /* Semantic colors */
   --color-primary: var(--color-navy);
@@ -14,32 +21,32 @@
   --color-accent: var(--color-gold);
   --color-warning: var(--color-sandy);
   --color-error: var(--color-tomato);
-  --color-success: #2d8a5e;
+  --color-success: var(--muted-teal);
 
   /* Backgrounds */
   --bg-primary: var(--color-chiffon);
-  --bg-secondary: #fffdf5;
+  --bg-secondary: #f4f7f2;
   --bg-surface: #ffffff;
   --bg-card: rgba(255, 255, 255, 0.92);
 
   /* Text */
   --text-primary: var(--color-navy);
-  --text-secondary: #3a5a7a;
-  --text-muted: #6a7a8a;
-  --text-inverted: var(--color-chiffon);
+  --text-secondary: var(--dark-slate-grey);
+  --text-muted: var(--deep-teal);
+  --text-inverted: #f6f8f4;
 
   /* UI */
-  --border: rgba(13, 59, 102, 0.12);
-  --shadow: 0 18px 40px rgba(13, 59, 102, 0.12);
+  --border: rgba(47, 62, 70, 0.14);
+  --shadow: 0 18px 40px rgba(47, 62, 70, 0.12);
 
   /* Chart colors */
   --chart-1: var(--color-navy);
-  --chart-2: var(--color-gold);
+  --chart-2: var(--dark-slate-grey);
   --chart-3: var(--color-sandy);
-  --chart-4: var(--color-tomato);
-  --chart-5: #5a8a9a;
-  --chart-grid: rgba(13, 59, 102, 0.1);
-  --chart-bg: var(--color-chiffon);
+  --chart-4: var(--color-gold);
+  --chart-5: var(--color-chiffon);
+  --chart-grid: rgba(47, 62, 70, 0.12);
+  --chart-bg: var(--bg-secondary);
 }
 
 * {
@@ -77,7 +84,7 @@ a {
 
 code {
   font-family: "SFMono-Regular", "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  background: rgba(13, 59, 102, 0.08);
+  background: rgba(47, 62, 70, 0.08);
   padding: 0.1rem 0.35rem;
   border-radius: 6px;
 }
@@ -114,7 +121,7 @@ code {
   font-size: 0.85rem;
   padding: 0.4rem 0.8rem;
   border-radius: 999px;
-  background: rgba(244, 211, 94, 0.2);
+  background: rgba(132, 169, 140, 0.24);
   color: var(--color-primary);
   font-weight: 600;
 }
@@ -134,7 +141,7 @@ code {
 }
 
 .site-nav a:hover {
-  background: rgba(244, 211, 94, 0.15);
+  background: rgba(132, 169, 140, 0.2);
   color: var(--color-primary);
 }
 
@@ -182,7 +189,7 @@ code {
 .pill-outline {
   background: transparent;
   color: var(--color-primary);
-  border: 1px solid rgba(13, 59, 102, 0.4);
+  border: 1px solid rgba(47, 62, 70, 0.35);
 }
 
 .hero-panel {
@@ -219,7 +226,7 @@ code {
   padding: 0.65rem 0.8rem;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(13, 59, 102, 0.08);
+  border: 1px solid rgba(47, 62, 70, 0.1);
 }
 
 .section {
@@ -253,14 +260,14 @@ code {
 }
 
 .flash-success {
-  background: rgba(45, 138, 94, 0.12);
-  border: 1px solid rgba(45, 138, 94, 0.35);
+  background: rgba(132, 169, 140, 0.16);
+  border: 1px solid rgba(82, 121, 111, 0.35);
   color: var(--text-primary);
 }
 
 .flash-error {
-  background: rgba(249, 87, 56, 0.12);
-  border: 1px solid rgba(249, 87, 56, 0.35);
+  background: rgba(53, 79, 82, 0.14);
+  border: 1px solid rgba(53, 79, 82, 0.35);
   color: var(--text-primary);
 }
 
@@ -372,12 +379,12 @@ code {
 
 .data-table td {
   padding: 0.85rem 0.6rem;
-  border-bottom: 1px solid rgba(13, 59, 102, 0.08);
+  border-bottom: 1px solid rgba(47, 62, 70, 0.1);
   color: var(--text-primary);
 }
 
 .data-table tr:hover td {
-  background: rgba(244, 211, 94, 0.1);
+  background: rgba(132, 169, 140, 0.16);
 }
 
 .table-link {
@@ -472,7 +479,7 @@ code {
   gap: 0.6rem 1rem;
   padding: 0.65rem 0.75rem;
   border-radius: 14px;
-  background: rgba(244, 211, 94, 0.15);
+  background: rgba(132, 169, 140, 0.18);
   color: var(--text-primary);
   font-size: 0.9rem;
 }
@@ -481,8 +488,8 @@ code {
   margin: 1rem 0 1.5rem;
   padding: 1rem 1.2rem;
   border-radius: 16px;
-  background: rgba(238, 150, 75, 0.12);
-  border: 1px solid rgba(238, 150, 75, 0.4);
+  background: rgba(82, 121, 111, 0.14);
+  border: 1px solid rgba(82, 121, 111, 0.35);
   color: var(--text-primary);
 }
 
@@ -490,8 +497,8 @@ code {
   margin: 1rem 0 1.5rem;
   padding: 1rem 1.2rem;
   border-radius: 16px;
-  background: rgba(249, 87, 56, 0.12);
-  border: 1px solid rgba(249, 87, 56, 0.4);
+  background: rgba(53, 79, 82, 0.14);
+  border: 1px solid rgba(53, 79, 82, 0.35);
 }
 
 .error-card h3 {
@@ -560,7 +567,7 @@ code {
 .field-group select {
   padding: 0.6rem 0.7rem;
   border-radius: 10px;
-  border: 1px solid rgba(13, 59, 102, 0.2);
+  border: 1px solid rgba(47, 62, 70, 0.25);
   font-size: 0.95rem;
   font-family: inherit;
 }
@@ -568,8 +575,8 @@ code {
 .field-group input:focus,
 .field-group select:focus {
   outline: none;
-  border-color: rgba(13, 59, 102, 0.6);
-  box-shadow: 0 0 0 3px rgba(13, 59, 102, 0.12);
+  border-color: rgba(47, 62, 70, 0.55);
+  box-shadow: 0 0 0 3px rgba(47, 62, 70, 0.14);
 }
 
 .form-actions {
@@ -592,7 +599,7 @@ code {
 .button-outline {
   background: transparent;
   color: var(--color-primary);
-  border: 1px solid rgba(13, 59, 102, 0.4);
+  border: 1px solid rgba(47, 62, 70, 0.35);
 }
 
 .site-footer {

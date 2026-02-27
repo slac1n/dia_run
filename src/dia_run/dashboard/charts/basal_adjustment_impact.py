@@ -5,7 +5,6 @@ import polars as pl
 from dia_run.dashboard.charts.theme import (
     CHART_GRID,
     MAIN_COLOR,
-    NAVY,
     get_default_layout,
     get_empty_chart_layout,
 )
@@ -92,9 +91,9 @@ def create_basal_adjustment_tir_chart(*, data_processor: DataProcessor) -> go.Fi
                     size=12,
                     color=MAIN_COLOR,
                     opacity=0.8,
-                    line=dict(width=1.5, color=NAVY),
+                    line=dict(width=1.5, color=MAIN_COLOR),
                 ),
-                line=dict(color=NAVY, width=2.0),
+                line=dict(color=MAIN_COLOR, width=2.0),
                 width=0.7,
                 hovertemplate=(
                     "<b>%{customdata[4]}</b><br>"

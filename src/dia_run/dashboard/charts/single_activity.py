@@ -73,8 +73,22 @@ def create_single_activity_carelink_chart(*, data_processor: DataProcessor, acti
             secondary_y=True,
         )
 
-    _add_vertical_line(fig=fig, datetime_instance=start_datetime, color=COLOR_SUCCESS, name="Start")
-    _add_vertical_line(fig=fig, datetime_instance=end_datetime, color=TOMATO, name="End")
+    _add_vertical_line(
+        fig=fig,
+        datetime_instance=start_datetime,
+        color=COLOR_SUCCESS,
+        name="Start",
+        dash="solid",
+        width=2.4,
+    )
+    _add_vertical_line(
+        fig=fig,
+        datetime_instance=end_datetime,
+        color=TOMATO,
+        name="End",
+        dash="longdash",
+        width=2.4,
+    )
 
     fig.add_shape(
         type="rect",
@@ -93,14 +107,28 @@ def create_single_activity_carelink_chart(*, data_processor: DataProcessor, acti
     if questionnaire.pre_run:
         for prerun in questionnaire.pre_run:
             prerun_time = start_datetime + timedelta(minutes=prerun.time_before_start_min)
-            _add_vertical_line(fig=fig, datetime_instance=prerun_time, color=GOLD, name="Pre-Run Nutrition")
+            _add_vertical_line(
+                fig=fig,
+                datetime_instance=prerun_time,
+                color=SANDY,
+                name="Pre-Run Nutrition",
+                dash="dash",
+                width=2.0,
+                opacity=0.9,
+            )
 
     if questionnaire.fueling_during_run:
         for fuel_instance, fuel in enumerate(questionnaire.fueling_during_run):
             fuel_time_diff = fuel.time_during_run_min
             fuel_time = start_datetime + timedelta(minutes=fuel_time_diff)
             _add_vertical_line(
-                fig=fig, datetime_instance=fuel_time, color=NAVY, name=f"Fueling {int(fuel_instance) + 1}"
+                fig=fig,
+                datetime_instance=fuel_time,
+                color=NAVY,
+                name=f"Fueling {int(fuel_instance) + 1}",
+                dash="dot",
+                width=1.8,
+                opacity=0.85,
             )
 
     fig.update_layout(
@@ -115,13 +143,23 @@ def create_single_activity_carelink_chart(*, data_processor: DataProcessor, acti
     return fig
 
 
-def _add_vertical_line(*, fig: go.Figure, datetime_instance: datetime, color: str, name: str) -> None:
+def _add_vertical_line(
+    *,
+    fig: go.Figure,
+    datetime_instance: datetime,
+    color: str,
+    name: str,
+    dash: str = "dash",
+    width: float = 1.5,
+    opacity: float = 1.0,
+) -> None:
     fig.add_trace(
         go.Scatter(
             x=[datetime_instance, datetime_instance],
             y=[70, 250],
             mode="lines",
             name=name,
-            line=dict(color=color, width=1, dash="dash"),
+            line=dict(color=color, width=width, dash=dash),
+            opacity=opacity,
         )
     )

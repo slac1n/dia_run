@@ -1,7 +1,7 @@
 import plotly.graph_objects as go
 import polars as pl
 
-from dia_run.dashboard.charts.theme import MAIN_COLOR, NAVY, TARGET_RANGE_FILL, get_color_for_index, get_default_layout
+from dia_run.dashboard.charts.theme import MAIN_COLOR, TARGET_RANGE_FILL, get_color_for_index, get_default_layout
 from dia_run.data_models.constants import TARGET_GLUCOSE_LOWER, TARGET_GLUCOSE_UPPER
 from dia_run.data_models.run_types import RunType
 from dia_run.data_processing.data_processing import DataProcessor
@@ -79,7 +79,7 @@ def create_run_type_heartrate_chart(*, data_processor: DataProcessor, run_type_o
                 y=df_heartrate.filter(pl.col("run_type") == run_type)["heartrate"],
                 name=run_type,
                 marker={"color": MAIN_COLOR},
-                line={"color": NAVY},
+                line={"color": MAIN_COLOR},
             )
         )
     fig.update_layout(
@@ -101,7 +101,7 @@ def create_run_type_glucose_chart(*, data_processor: DataProcessor, run_type_ord
                 y=df_glucose.filter(pl.col("run_type") == run_type)["value"],
                 name=run_type,
                 marker={"color": MAIN_COLOR},
-                line={"color": NAVY},
+                line={"color": MAIN_COLOR},
             )
         )
         # highlight the target range
