@@ -51,4 +51,42 @@
   </div>
   {% endif %}
 </section>
+{% if auto_refresh %}
+<script>
+  (() => {
+    const initialCount = Number("{{ activity_count }}");
+    let attempts = 0;
+    const maxAttempts = 120;
+
+    const pollStatus = async () => {
+      attempts += 1;
+      if (attempts > maxAttempts) {
+        window.clearInterval(timer);
+        return;
+      }
+
+      try {
+        const response = await fetch("/questionnaire/status", {
+          headers: { "Accept": "application/json" },
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = await response.json();
+        if (Number(payload.unannotated_count) !== initialCount) {
+          window.clearInterval(timer);
+          window.location.reload();
+        }
+      } catch {
+        // ignore transient network errors while polling
+      }
+    };
+
+    const timer = window.setInterval(pollStatus, 3000);
+    void pollStatus();
+  })();
+</script>
+{% endif %}
 {% endblock %}
