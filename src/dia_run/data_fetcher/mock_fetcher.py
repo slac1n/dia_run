@@ -85,11 +85,11 @@ class MockDataFetcher:
                 "elapsed_time": [int(moving_time * random.uniform(1.0, 1.15))],
                 "total_elevation_gain": [random.uniform(10, 200)],
                 "average_heartrate": [random.uniform(135, 170)],
-                "max_heartrate": [random.uniform(170, 195)],
+                "max_heartrate": [random.randint(170, 195)],
                 "average_speed": [avg_speed],
                 "max_speed": [max_speed],
                 "average_watts": [random.uniform(130, 220)],
-                "max_watts": [random.uniform(220, 350)],
+                "max_watts": [random.randint(220, 350)],
                 "kilojoules": [random.uniform(200, 1200)],
             }
         ).with_columns(

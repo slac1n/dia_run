@@ -41,11 +41,11 @@ def generate_strava_summary() -> pl.DataFrame:
             "elapsed_time": [1740, 2880, 5940],
             "total_elevation_gain": [35.0, 72.0, 145.0],
             "average_heartrate": [142.0, 168.0, 153.0],
-            "max_heartrate": [158.0, 188.0, 172.0],
+            "max_heartrate": [158, 188, 172],
             "average_speed": [3.1, 3.15, 3.16],
             "max_speed": [3.6, 5.2, 3.8],
             "average_watts": [155.0, 210.0, 180.0],
-            "max_watts": [195.0, 310.0, 245.0],
+            "max_watts": [195, 310, 245],
             "kilojoules": [420.0, 680.0, 1050.0],
         }
     ).with_columns(
