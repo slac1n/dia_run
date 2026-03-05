@@ -1,3 +1,9 @@
+## v0.19.1 (2026-03-05)
+
+### Fix
+
+- auto-refresh questionnaire list after fetch (#39)
+
 ## v0.19.0 (2026-02-27)
 
 ### Feat
