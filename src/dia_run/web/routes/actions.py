@@ -4,19 +4,17 @@ from fastapi import APIRouter, BackgroundTasks, Depends
 from fastapi.responses import RedirectResponse
 from loguru import logger
 
-from dia_run.data_fetcher.data_fetcher import DataFetcher
-from dia_run.data_models.paths import DataPaths
-from dia_run.web.dependencies import get_data_paths
+from dia_run.data_fetcher.fetcher_protocol import DataFetcherService
+from dia_run.web.dependencies import get_data_fetcher_service
 from dia_run.web.fetch_status import set_fetch_status
 
 router = APIRouter()
 
 
-def _fetch_data_task(*, data_paths: DataPaths) -> None:
+def _fetch_data_task(*, fetcher: DataFetcherService) -> None:
     set_fetch_status(status="started")
-    data_fetcher = DataFetcher(data_paths=data_paths)
     try:
-        data_fetcher.fetch_latest_data_and_save()
+        fetcher.fetch_latest_data_and_save()
         set_fetch_status(status="success")
     except ValueError as exc:
         logger.error("Data fetch failed: {error}", error=str(exc))
@@ -27,7 +25,7 @@ def _fetch_data_task(*, data_paths: DataPaths) -> None:
 def fetch_new_data(
     *,
     background_tasks: BackgroundTasks,
-    data_paths: Annotated[DataPaths, Depends(get_data_paths)],
+    fetcher: Annotated[DataFetcherService, Depends(get_data_fetcher_service)],
 ) -> RedirectResponse:
-    background_tasks.add_task(_fetch_data_task, data_paths=data_paths)
+    background_tasks.add_task(_fetch_data_task, fetcher=fetcher)
     return RedirectResponse(url="/questionnaire?fetch=started", status_code=303)

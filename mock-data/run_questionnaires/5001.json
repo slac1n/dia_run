@@ -1,0 +1,19 @@
+{
+  "pre_run": [
+    {
+      "carbohydrates_g": 20,
+      "time_before_start_min": -30,
+      "bolus_percentage": 50.0,
+      "food_type": "Banana"
+    }
+  ],
+  "basal_adjustments": [
+    {
+      "type": "Temporal SmartGuard",
+      "start_time_min": -15,
+      "end_time_min": 30
+    }
+  ],
+  "fueling_during_run": [],
+  "bolus": []
+}

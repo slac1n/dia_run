@@ -1,0 +1,36 @@
+{
+  "pre_run": [
+    {
+      "carbohydrates_g": 35,
+      "time_before_start_min": -45,
+      "bolus_percentage": 65.0,
+      "food_type": "Energy Bar"
+    }
+  ],
+  "basal_adjustments": [
+    {
+      "type": "Temporal SmartGuard",
+      "start_time_min": -10,
+      "end_time_min": 50
+    },
+    {
+      "type": "Temporal Basalrate",
+      "start_time_min": 50,
+      "end_time_min": 120,
+      "basal_rate_percentage": 25.0
+    }
+  ],
+  "fueling_during_run": [
+    {
+      "carbohydrates_g": 20,
+      "time_during_run_min": 20,
+      "food_type": "Energy Gel"
+    }
+  ],
+  "bolus": [
+    {
+      "time_of_bolus_min": 25,
+      "bolus_units": 0.5
+    }
+  ]
+}
