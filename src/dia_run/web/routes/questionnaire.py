@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from dia_run.data_models.questionnaire import QuestionnaireModel
 from dia_run.data_processing.data_processing import DataProcessor
 from dia_run.web.dependencies import get_data_processor
+from dia_run.web.fetch_status import FetchStatus, get_fetch_status
 from dia_run.web.templates import templates
 
 router = APIRouter(prefix="/questionnaire")
@@ -30,22 +31,24 @@ def _format_validation_errors(*, errors: Sequence[Mapping[str, object]]) -> list
     return formatted
 
 
+def _get_unannotated_activities(*, data_processor: DataProcessor) -> pl.DataFrame:
+    data_paths = data_processor.data_paths
+    data_paths.questionnaire.mkdir(parents=True, exist_ok=True)
+    df_summary = data_processor.get_summary()
+
+    existing_ids = {int(path.stem) for path in data_paths.questionnaire.glob("*.json") if path.stem.isdigit()}
+    if existing_ids:
+        return df_summary.filter(~pl.col("activity_id").is_in(list(existing_ids)))
+    return df_summary
+
+
 @router.get("", response_class=HTMLResponse)
 def questionnaire_list(
     request: Request,
     *,
     data_processor: Annotated[DataProcessor, Depends(get_data_processor)],
 ) -> HTMLResponse:
-    data_paths = data_processor.data_paths
-    data_paths.questionnaire.mkdir(parents=True, exist_ok=True)
-    df_summary = data_processor.get_summary()
-
-    existing_ids = {int(path.stem) for path in data_paths.questionnaire.glob("*.json") if path.stem.isdigit()}
-
-    if existing_ids:
-        df_unannotated = df_summary.filter(~pl.col("activity_id").is_in(list(existing_ids)))
-    else:
-        df_unannotated = df_summary
+    df_unannotated = _get_unannotated_activities(data_processor=data_processor)
 
     activities: list[dict[str, str | int]] = []
     for row in df_unannotated.sort("start_date_local", descending=True).iter_rows(named=True):
@@ -94,8 +97,14 @@ def questionnaire_list(
             "activities": activities,
             "activity_count": len(activities),
             "flash": flash,
+            "auto_refresh": fetch_status == "started",
         },
     )
+
+
+@router.get("/status")
+def questionnaire_status() -> dict[str, FetchStatus]:
+    return {"status": get_fetch_status()}
 
 
 @router.get("/{activity_id}", response_class=HTMLResponse)

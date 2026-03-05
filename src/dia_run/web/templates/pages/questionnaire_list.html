@@ -51,4 +51,43 @@
   </div>
   {% endif %}
 </section>
+{% if auto_refresh %}
+<script>
+  (() => {
+    let attempts = 0;
+    const maxAttempts = 120; // 6 minutes at 3s per poll
+
+    const pollStatus = async () => {
+      attempts += 1;
+      if (attempts > maxAttempts) {
+        return; // stop polling after 6 minutes
+      }
+
+      try {
+        const response = await fetch("/questionnaire/status", {
+          headers: { "Accept": "application/json" },
+          cache: "no-store",
+        });
+
+        if (response.ok) {
+          const payload = await response.json();
+          if (payload.status === "success") {
+            window.location.href = "/questionnaire?fetch=success";
+            return;
+          } else if (payload.status === "error") {
+            window.location.href = "/questionnaire?fetch=error";
+            return;
+          }
+        }
+      } catch {
+        // ignore transient network errors while polling
+      }
+
+      window.setTimeout(pollStatus, 3000);
+    };
+
+    window.setTimeout(pollStatus, 3000);
+  })();
+</script>
+{% endif %}
 {% endblock %}
