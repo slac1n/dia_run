@@ -16,7 +16,7 @@ from dia_run.data_models.schemas import SpecificCarelinkSchema
 class LiveDataFetcher:
     """Fetches real data from Strava and CareLink APIs and writes to Delta Lake tables."""
 
-    def __init__(self, *, data_paths: DataPaths):
+    def __init__(self, *, data_paths: DataPaths) -> None:
         self.STRAVA_SUMMARY_DIR: Path = data_paths.strava_summary
         self.STRAVA_STREAM_DIR: Path = data_paths.strava_stream
         self.CARELINK_DIR: Path = data_paths.carelink

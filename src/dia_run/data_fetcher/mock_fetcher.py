@@ -2,6 +2,7 @@ import random
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import pandera.errors as pandera_errors
 import polars as pl
 from loguru import logger
 
@@ -12,7 +13,7 @@ from dia_run.data_models.schemas import SpecificCarelinkSchema
 class MockDataFetcher:
     """Generates synthetic data and writes to Delta Lake tables. No real API calls are made."""
 
-    def __init__(self, *, data_paths: DataPaths):
+    def __init__(self, *, data_paths: DataPaths) -> None:
         self.STRAVA_SUMMARY_DIR: Path = data_paths.strava_summary
         self.STRAVA_STREAM_DIR: Path = data_paths.strava_stream
         self.CARELINK_DIR: Path = data_paths.carelink
@@ -44,7 +45,10 @@ class MockDataFetcher:
         summary_df.write_delta(self.STRAVA_SUMMARY_DIR, mode="append", delta_write_options={"schema_mode": "merge"})
 
         logger.info("[MOCK] Validating carelink data...")
-        SpecificCarelinkSchema.validate(carelink_df)
+        try:
+            SpecificCarelinkSchema.validate(carelink_df)
+        except pandera_errors.SchemaError as e:
+            raise ValueError(f"[MOCK] CareLink data validation failed: {e}") from e
         logger.info("[MOCK] Saving carelink data...")
         carelink_df.write_delta(self.CARELINK_DIR, mode="append", delta_write_options={"schema_mode": "merge"})
 
