@@ -1,3 +1,9 @@
+## v0.20.0 (2026-03-05)
+
+### Feat
+
+- **TG-34**: introduce mock data mode for safe full-stack local development (#40)
+
 ## v0.19.1 (2026-03-05)
 
 ### Fix
