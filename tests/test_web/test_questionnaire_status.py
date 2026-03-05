@@ -1,66 +1,52 @@
-import json
-
-import polars as pl
-import pytest
 from fastapi.testclient import TestClient
 
-from dia_run.data_models.paths import DataPaths
 from dia_run.web.app import app
-from dia_run.web.dependencies import get_data_paths
+from dia_run.web.fetch_status import get_fetch_status, set_fetch_status
 
 
-@pytest.fixture
-def status_data_paths(
-    *,
-    tmp_path_factory: pytest.TempPathFactory,
-    strava_summary_data: pl.DataFrame,
-    carelink_data: pl.DataFrame,
-    strava_stream_data: pl.DataFrame,
-    questionnaire_data: dict[int, dict],
-) -> DataPaths:
-    root = tmp_path_factory.mktemp("questionnaire_status_data")
-    carelink_dir = root / "carelink"
-    strava_summary_dir = root / "strava" / "summary"
-    strava_stream_dir = root / "strava" / "stream"
-    questionnaire_dir = root / "run_questionnaires"
+class TestFetchStatusModule:
+    def test_default_status_is_none(self) -> None:
+        set_fetch_status(status="none")
+        assert get_fetch_status() == "none"
 
-    carelink_dir.mkdir(parents=True, exist_ok=True)
-    strava_summary_dir.mkdir(parents=True, exist_ok=True)
-    strava_stream_dir.mkdir(parents=True, exist_ok=True)
-    questionnaire_dir.mkdir(parents=True, exist_ok=True)
+    def test_set_and_get_started(self) -> None:
+        set_fetch_status(status="started")
+        assert get_fetch_status() == "started"
 
-    data_paths = DataPaths(
-        carelink=carelink_dir,
-        strava_summary=strava_summary_dir,
-        strava_stream=strava_stream_dir,
-        questionnaire=questionnaire_dir,
-    )
+    def test_set_and_get_success(self) -> None:
+        set_fetch_status(status="success")
+        assert get_fetch_status() == "success"
 
-    strava_summary_data.write_delta(str(data_paths.strava_summary))
-    carelink_data.write_delta(str(data_paths.carelink))
-    strava_stream_data.write_delta(str(data_paths.strava_stream))
-    for activity_id, payload in questionnaire_data.items():
-        with open(data_paths.questionnaire / f"{activity_id}.json", "w") as file_handle:
-            json.dump(payload, file_handle)
-
-    return data_paths
+    def test_set_and_get_error(self) -> None:
+        set_fetch_status(status="error")
+        assert get_fetch_status() == "error"
 
 
-@pytest.fixture
-def client(*, status_data_paths: DataPaths) -> TestClient:
-    app.dependency_overrides[get_data_paths] = lambda: status_data_paths
-    with TestClient(app) as test_client:
-        yield test_client
-    app.dependency_overrides.clear()
+class TestQuestionnaireStatusEndpoint:
+    def test_returns_current_fetch_status(self) -> None:
+        set_fetch_status(status="none")
+        with TestClient(app) as client:
+            response = client.get("/questionnaire/status")
+            assert response.status_code == 200
+            assert response.json() == {"status": "none"}
 
+    def test_returns_started_after_fetch_begins(self) -> None:
+        set_fetch_status(status="started")
+        with TestClient(app) as client:
+            response = client.get("/questionnaire/status")
+            assert response.status_code == 200
+            assert response.json() == {"status": "started"}
 
-def test_questionnaire_status_counts_unannotated(*, client: TestClient, status_data_paths: DataPaths) -> None:
-    response = client.get("/questionnaire/status")
-    assert response.status_code == 200
-    assert response.json() == {"unannotated_count": 0}
+    def test_returns_success_after_fetch_completes(self) -> None:
+        set_fetch_status(status="success")
+        with TestClient(app) as client:
+            response = client.get("/questionnaire/status")
+            assert response.status_code == 200
+            assert response.json() == {"status": "success"}
 
-    (status_data_paths.questionnaire / "1004.json").unlink(missing_ok=True)
-
-    response = client.get("/questionnaire/status")
-    assert response.status_code == 200
-    assert response.json() == {"unannotated_count": 1}
+    def test_returns_error_after_fetch_fails(self) -> None:
+        set_fetch_status(status="error")
+        with TestClient(app) as client:
+            response = client.get("/questionnaire/status")
+            assert response.status_code == 200
+            assert response.json() == {"status": "error"}

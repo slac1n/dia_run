@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from dia_run.data_models.questionnaire import QuestionnaireModel
 from dia_run.data_processing.data_processing import DataProcessor
 from dia_run.web.dependencies import get_data_processor
+from dia_run.web.fetch_status import FetchStatus, get_fetch_status
 from dia_run.web.templates import templates
 
 router = APIRouter(prefix="/questionnaire")
@@ -102,12 +103,8 @@ def questionnaire_list(
 
 
 @router.get("/status")
-def questionnaire_status(
-    *,
-    data_processor: Annotated[DataProcessor, Depends(get_data_processor)],
-) -> dict[str, int]:
-    df_unannotated = _get_unannotated_activities(data_processor=data_processor)
-    return {"unannotated_count": len(df_unannotated)}
+def questionnaire_status() -> dict[str, FetchStatus]:
+    return {"status": get_fetch_status()}
 
 
 @router.get("/{activity_id}", response_class=HTMLResponse)

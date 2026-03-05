@@ -54,15 +54,13 @@
 {% if auto_refresh %}
 <script>
   (() => {
-    const initialCount = Number("{{ activity_count }}");
     let attempts = 0;
-    const maxAttempts = 120;
+    const maxAttempts = 120; // 6 minutes at 3s per poll
 
     const pollStatus = async () => {
       attempts += 1;
       if (attempts > maxAttempts) {
-        window.clearInterval(timer);
-        return;
+        return; // stop polling after 6 minutes
       }
 
       try {
@@ -70,22 +68,25 @@
           headers: { "Accept": "application/json" },
           cache: "no-store",
         });
-        if (!response.ok) {
-          return;
-        }
 
-        const payload = await response.json();
-        if (Number(payload.unannotated_count) !== initialCount) {
-          window.clearInterval(timer);
-          window.location.reload();
+        if (response.ok) {
+          const payload = await response.json();
+          if (payload.status === "success") {
+            window.location.href = "/questionnaire?fetch=success";
+            return;
+          } else if (payload.status === "error") {
+            window.location.href = "/questionnaire?fetch=error";
+            return;
+          }
         }
       } catch {
         // ignore transient network errors while polling
       }
+
+      window.setTimeout(pollStatus, 3000);
     };
 
-    const timer = window.setInterval(pollStatus, 3000);
-    void pollStatus();
+    window.setTimeout(pollStatus, 3000);
   })();
 </script>
 {% endif %}
