@@ -1,0 +1,31 @@
+{
+  "pre_run": [
+    {
+      "carbohydrates_g": 50,
+      "time_before_start_min": -60,
+      "bolus_percentage": 70.0,
+      "food_type": "Oatmeal"
+    }
+  ],
+  "basal_adjustments": [
+    {
+      "type": "Temporal Basalrate",
+      "start_time_min": -30,
+      "end_time_min": 100,
+      "basal_rate_percentage": 20.0
+    }
+  ],
+  "fueling_during_run": [
+    {
+      "carbohydrates_g": 25,
+      "time_during_run_min": 25,
+      "food_type": "Energy Gel"
+    },
+    {
+      "carbohydrates_g": 25,
+      "time_during_run_min": 50,
+      "food_type": "Sports Drink"
+    }
+  ],
+  "bolus": []
+}

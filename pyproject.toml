@@ -26,6 +26,7 @@ dependencies = [
   "statsmodels>=0.14.4",
   "stravalib>=2.1",
   "uvicorn>=0.30.0",
+  "pydantic-settings>=2.13.1",
 ]
 
 
