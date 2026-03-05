@@ -1,4 +1,3 @@
-import json
 import random
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -52,8 +51,8 @@ class MockDataFetcher:
         logger.info("[MOCK] Saving strava stream data...")
         stream_df.write_delta(self.STRAVA_STREAM_DIR, mode="append", delta_write_options={"schema_mode": "merge"})
 
-        self._generate_questionnaire(activity_id=activity_id)
         logger.info(f"[MOCK] Successfully generated mock activity {activity_id}")
+        logger.info("[MOCK] Questionnaire not auto-generated — fill it out via the frontend")
 
     def _get_existing_activity_ids(self) -> list[int]:
         delta_log = self.STRAVA_SUMMARY_DIR / "_delta_log"
@@ -167,35 +166,3 @@ class MockDataFetcher:
         )
 
         return pl.DataFrame(data).with_columns(pl.col("datetime").cast(pl.Datetime))
-
-    def _generate_questionnaire(self, *, activity_id: int) -> None:
-        questionnaire = {
-            "pre_run": [
-                {
-                    "carbohydrates_g": random.choice([15, 20, 25, 30, 40]),
-                    "time_before_start_min": -random.randint(15, 60),
-                    "bolus_percentage": round(random.uniform(40, 80), 0),
-                    "food_type": random.choice(["Energy Bar", "Banana", "Oatmeal", "Toast"]),
-                }
-            ],
-            "basal_adjustments": [
-                {
-                    "type": random.choice(["Temporal SmartGuard", "Temporal Basalrate"]),
-                    "start_time_min": -random.randint(10, 60),
-                    "end_time_min": random.randint(30, 120),
-                    "basal_rate_percentage": round(random.uniform(10, 50), 0),
-                }
-            ],
-            "fueling_during_run": [
-                {
-                    "carbohydrates_g": random.choice([15, 20, 25]),
-                    "time_during_run_min": random.randint(15, 45),
-                    "food_type": random.choice(["Energy Gel", "Sports Drink", "Gummy Bears"]),
-                }
-            ],
-            "bolus": [],
-        }
-        filepath = self.QUESTIONNAIRE_DIR / f"{activity_id}.json"
-        with open(filepath, "w") as f:
-            json.dump(questionnaire, f, indent=2)
-        logger.info(f"[MOCK] Saved questionnaire to {filepath}")

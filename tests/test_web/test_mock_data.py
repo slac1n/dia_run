@@ -116,19 +116,13 @@ class TestMockDataFetcher:
         # Validate against Pandera schema
         SpecificCarelinkSchema.validate(df)
 
-    def test_fetch_writes_questionnaire_json(self, *, mock_data_paths: DataPaths) -> None:
+    def test_fetch_does_not_create_questionnaire(self, *, mock_data_paths: DataPaths) -> None:
+        """Questionnaire should NOT be auto-generated — the user fills it out via the frontend."""
         fetcher = MockDataFetcher(data_paths=mock_data_paths)
         fetcher.fetch_latest_data_and_save()
 
         json_files = list(mock_data_paths.questionnaire.glob("*.json"))
-        assert len(json_files) == 1
-
-        with open(json_files[0]) as f:
-            data = json.load(f)
-        assert "pre_run" in data
-        assert "basal_adjustments" in data
-        assert "fueling_during_run" in data
-        assert "bolus" in data
+        assert len(json_files) == 0
 
     def test_fetch_appends_new_activity(self, *, mock_data_paths: DataPaths) -> None:
         fetcher = MockDataFetcher(data_paths=mock_data_paths)
