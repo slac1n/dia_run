@@ -16,6 +16,23 @@ To run all hooks manually against the entire codebase:
 uv run pre-commit run --all-files
 ```
 
+### Architecture Diagram
+This project includes a living Mermaid class diagram that visualises the codebase structure. The diagram is stored in `docs/diagram.mmd`.
+
+To render and view it:
+```bash
+# Install the Mermaid CLI if you don't have it
+npm install -g @mermaid-js/mermaid-cli
+
+# Generate SVG from the diagram
+mmdc -i docs/diagram.mmd -o docs/diagram.svg
+
+# Open in your browser
+open docs/diagram.svg
+```
+
+Alternatively, open `docs/diagram.mmd` directly in VS Code — it has built-in Mermaid preview support.
+
 ### Prepare Strava
 You need to set up [Strava API](https://developers.strava.com/docs/getting-started/) for you account and create an app.
 After that create a `.env` file and fill out the variables `CLIENT_ID` and `CLIENT_SECRET` from your newly created app.

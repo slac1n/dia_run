@@ -1,0 +1,415 @@
+classDiagram
+    direction TB
+
+    %% ──────────────────────────────────────────────
+    %% Settings
+    %% ──────────────────────────────────────────────
+
+    class AppSettings {
+        +bool use_mock_data
+    }
+
+    %% ──────────────────────────────────────────────
+    %% Data Models – Core
+    %% ──────────────────────────────────────────────
+
+    class DataPaths {
+        +Path strava_summary
+        +Path strava_stream
+        +Path carelink
+        +Path questionnaire
+    }
+
+    class RunType {
+        <<StrEnum>>
+        EASY
+        INTERVAL
+        TEMPO
+        LONG
+        RACE
+        OTHER
+        +get_keyword(run_type) str | None
+        +get_race_pattern() str
+    }
+
+    class KpiModel {
+        +float total_distance_km
+        +int total_running_time_minutes
+        +float | None avg_sensor_glucose
+        +float | None time_in_range_percentage
+        +formatted_running_time str
+    }
+
+    %% ──────────────────────────────────────────────
+    %% Data Models – Questionnaire
+    %% ──────────────────────────────────────────────
+
+    class PreRunInfo {
+        +int carbohydrates_g
+        +int time_before_start_min
+        +float bolus_percentage
+        +str food_type
+    }
+
+    class BasalAdjustment {
+        +str type
+        +int start_time_min
+        +int end_time_min
+        +float | None basal_rate_percentage
+    }
+
+    class FuelingEntry {
+        +int carbohydrates_g
+        +int time_during_run_min
+        +str food_type
+    }
+
+    class BolusEntry {
+        +int time_of_bolus_min
+        +float bolus_units
+    }
+
+    class QuestionnaireModel {
+        +list~PreRunInfo~ pre_run
+        +list~BasalAdjustment~ basal_adjustments
+        +list~FuelingEntry~ fueling_during_run
+        +list~BolusEntry~ bolus
+    }
+
+    QuestionnaireModel *-- PreRunInfo
+    QuestionnaireModel *-- BasalAdjustment
+    QuestionnaireModel *-- FuelingEntry
+    QuestionnaireModel *-- BolusEntry
+
+    %% ──────────────────────────────────────────────
+    %% Data Models – Calendar
+    %% ──────────────────────────────────────────────
+
+    class Calendar {
+        +list~list~ distance
+        +list~list~ dates
+    }
+
+    class CalendarWeek {
+        +list~float | None~ distance
+        +list~str | None~ dates
+    }
+
+    Calendar *-- CalendarWeek
+
+    %% ──────────────────────────────────────────────
+    %% Data Models – API Responses
+    %% ──────────────────────────────────────────────
+
+    class StravaActivitySummary {
+        +int id
+        +str name
+        +datetime start_date_local
+        +float distance
+        +int moving_time
+        +float | None average_heartrate
+        +float | None average_speed
+        +str type
+    }
+
+    class StravaStreamData {
+        +Sequence~int~ time
+        +Sequence~float | None~ heartrate
+        +Sequence~float | None~ watts
+        +Sequence~float | None~ velocity_smooth
+        +Sequence~bool~ moving
+    }
+
+    class CareLinkGlucoseReading {
+        +str timestamp
+        +float | None sg
+    }
+
+    class CareLinkMarker {
+        +str timestamp
+        +str type
+        +dict data
+    }
+
+    class CareLinkPatientData {
+        +list~CareLinkGlucoseReading~ sgs
+        +list~CareLinkMarker~ markers
+    }
+
+    class CareLinkResponse {
+        +CareLinkPatientData patientData
+    }
+
+    CareLinkResponse *-- CareLinkPatientData
+    CareLinkPatientData *-- CareLinkGlucoseReading
+    CareLinkPatientData *-- CareLinkMarker
+
+    %% ──────────────────────────────────────────────
+    %% Data Models – Pandera Schemas
+    %% ──────────────────────────────────────────────
+
+    class StravaSummarySchema {
+        <<DataFrameModel>>
+        +int activity_id
+        +str name
+        +datetime start_date_local
+        +float distance
+        +str run_type
+    }
+
+    class SummarySchema {
+        <<DataFrameModel>>
+        +float in_going_sg
+        +float out_going_sg
+        +float avg_sg
+        +float insulin_on_board_in_going
+    }
+
+    class SpecificCarelinkSchema {
+        <<DataFrameModel>>
+        +datetime datetime
+        +str type
+        +float value
+    }
+
+    class StreamsSchema {
+        <<DataFrameModel>>
+        +datetime datetime
+        +str run_type
+    }
+
+    class HeartrateStreamsSchema {
+        <<DataFrameModel>>
+        +int heartrate
+    }
+
+    class GlucoseStreamsSchema {
+        <<DataFrameModel>>
+        +float value
+    }
+
+    class BaseGlucoseStreamSchema {
+        <<DataFrameModel>>
+        +int activity_id
+    }
+
+    class AggregatedGlucoseSchema {
+        <<DataFrameModel>>
+        +int activity_id
+        +float avg_sg
+        +float in_going_sg
+        +float out_going_sg
+    }
+
+    class AggregateInsulinOnBoard {
+        <<DataFrameModel>>
+        +int activity_id
+        +float insulin_on_board_in_going
+    }
+
+    class PreRunInsulinSchema {
+        <<DataFrameModel>>
+        +int activity_id
+        +datetime datetime
+        +float value
+    }
+
+    class PreRunNutritionSummarySchema {
+        <<DataFrameModel>>
+        +int activity_id
+        +int total_carbohydrates_g
+        +float avg_bolus_percentage
+        +float in_going_sg
+    }
+
+    class FuelingGlucoseWindowSchema {
+        <<DataFrameModel>>
+        +int activity_id
+        +int fueling_index
+        +float minutes_relative
+        +float value
+    }
+
+    class FuelingImpactSchema {
+        <<DataFrameModel>>
+        +int activity_id
+        +int fueling_index
+        +int carbohydrates_g
+        +float baseline_sg
+        +float peak_sg
+    }
+
+    class BasalAdjustmentTirSchema {
+        <<DataFrameModel>>
+        +int activity_id
+        +int adjustment_index
+        +str type
+        +float tir_pct
+    }
+
+    SummarySchema --|> StravaSummarySchema
+    HeartrateStreamsSchema --|> StreamsSchema
+    GlucoseStreamsSchema --|> StreamsSchema
+    BaseGlucoseStreamSchema --|> GlucoseStreamsSchema
+
+    %% ──────────────────────────────────────────────
+    %% Data Processing
+    %% ──────────────────────────────────────────────
+
+    class DataProcessor {
+        -DataPaths data_paths
+        -DataFrame | None df_summary
+        +get_summary() DataFrame~SummarySchema~
+        +get_30_day_kpis(reference_date) KpiModel
+        +get_specific_carelink(activity_id, start_datetime, end_datetime) DataFrame~SpecificCarelinkSchema~
+        +get_questionnaire(activity_id) QuestionnaireModel
+        +get_pre_run_nutrition_summary() DataFrame~PreRunNutritionSummarySchema~
+        +get_heartrate_streams() DataFrame~HeartrateStreamsSchema~
+        +get_glucose_streams() DataFrame~GlucoseStreamsSchema~
+        +get_fueling_glucose_windows() DataFrame~FuelingGlucoseWindowSchema~
+        +get_fueling_impact() DataFrame~FuelingImpactSchema~
+        +get_basal_adjustment_tir() DataFrame~BasalAdjustmentTirSchema~
+    }
+
+    DataProcessor --> DataPaths
+    DataProcessor --> RunType
+    DataProcessor --> QuestionnaireModel
+    DataProcessor --> KpiModel
+    DataProcessor ..> SummarySchema : returns
+    DataProcessor ..> SpecificCarelinkSchema : returns
+    DataProcessor ..> HeartrateStreamsSchema : returns
+    DataProcessor ..> GlucoseStreamsSchema : returns
+    DataProcessor ..> PreRunNutritionSummarySchema : returns
+    DataProcessor ..> FuelingGlucoseWindowSchema : returns
+    DataProcessor ..> FuelingImpactSchema : returns
+    DataProcessor ..> BasalAdjustmentTirSchema : returns
+
+    %% ──────────────────────────────────────────────
+    %% Data Fetcher
+    %% ──────────────────────────────────────────────
+
+    class DataFetcherService {
+        <<Protocol>>
+        +fetch_latest_data_and_save() None
+    }
+
+    class LiveDataFetcher {
+        -Path STRAVA_SUMMARY_DIR
+        -Path STRAVA_STREAM_DIR
+        -Path CARELINK_DIR
+        -int | None latest_activity_id
+        +fetch_latest_data_and_save() None
+    }
+
+    class MockDataFetcher {
+        -Path STRAVA_SUMMARY_DIR
+        -Path STRAVA_STREAM_DIR
+        -Path CARELINK_DIR
+        -Path QUESTIONNAIRE_DIR
+        +fetch_latest_data_and_save() None
+    }
+
+    class CareLinkClient {
+        +init() bool
+        +getRecentData() dict | None
+        +getLastResponseCode() int | None
+    }
+
+    class RunFuelQuestionnaire {
+        -Path STRAVA_SUMMARY_DIR
+        -Path QUESTIONNAIRE_DIR
+        -int | None activity_id
+        +load_filtered_activities() DataFrame
+        +ask_activity_id() None
+        +ask_pre_run_info() None
+        +ask_bolus() None
+        +ask_basal_adjustments() None
+        +ask_fueling_during_run() None
+        +save_to_json() None
+        +ask_me() None
+    }
+
+    LiveDataFetcher ..|> DataFetcherService
+    MockDataFetcher ..|> DataFetcherService
+    LiveDataFetcher --> DataPaths
+    LiveDataFetcher --> CareLinkClient
+    LiveDataFetcher --> StravaActivitySummary
+    LiveDataFetcher --> StravaStreamData
+    LiveDataFetcher --> CareLinkResponse
+    MockDataFetcher --> DataPaths
+    RunFuelQuestionnaire --> DataPaths
+    RunFuelQuestionnaire --> QuestionnaireModel
+
+    %% ──────────────────────────────────────────────
+    %% Dashboard – Chart Functions
+    %% ──────────────────────────────────────────────
+
+    class SingleActivityCharts {
+        <<module>>
+        +create_single_activity_carelink_chart(data_processor, activity_id) Figure
+    }
+
+    class RunTypeCharts {
+        <<module>>
+        +create_run_type_pie_chart(data_processor, run_type_order) Figure
+        +create_run_type_distance_chart(data_processor, run_type_order) Figure
+        +create_run_type_heartrate_chart(data_processor, run_type_order) Figure
+        +create_run_type_glucose_chart(data_processor, run_type_order) Figure
+    }
+
+    class DiabetesManagementCharts {
+        <<module>>
+        +create_in_going_out_going_sensor_glucose_chart(data_processor) Figure
+        +create_insulin_on_board_and_normalized_glucose_change_chart(data_processor) Figure
+        +create_pre_nutrition_impact_chart(data_processor) Figure
+        +create_pre_nutrition_bolus_chart(data_processor) Figure
+        +create_pre_nutrition_timing_chart(data_processor) Figure
+        +create_pre_nutrition_heatmap(data_processor) Figure
+    }
+
+    class FuelingImpactCharts {
+        <<module>>
+        +create_fueling_glucose_response_chart(data_processor) Figure
+        +create_fueling_carbs_vs_peak_chart(data_processor) Figure
+    }
+
+    class ActivityCalendarCharts {
+        <<module>>
+        +create_activity_calendar_chart(df) Figure
+    }
+
+    class BasalAdjustmentImpactCharts {
+        <<module>>
+        +create_basal_adjustment_tir_chart(data_processor) Figure
+    }
+
+    SingleActivityCharts ..> DataProcessor
+    RunTypeCharts ..> DataProcessor
+    RunTypeCharts ..> RunType
+    DiabetesManagementCharts ..> DataProcessor
+    FuelingImpactCharts ..> DataProcessor
+    ActivityCalendarCharts ..> Calendar
+    BasalAdjustmentImpactCharts ..> DataProcessor
+
+    %% ──────────────────────────────────────────────
+    %% Web – FastAPI Application
+    %% ──────────────────────────────────────────────
+
+    class WebApp {
+        <<module: web.app>>
+        +create_app() FastAPI
+    }
+
+    class WebDependencies {
+        <<module: web.dependencies>>
+        +get_data_paths() DataPaths
+        +get_data_processor(data_paths) DataProcessor
+        +get_data_fetcher_service(data_paths) DataFetcherService
+    }
+
+    WebDependencies ..> AppSettings
+    WebDependencies ..> DataPaths
+    WebDependencies ..> DataProcessor
+    WebDependencies ..> DataFetcherService
+    WebDependencies ..> LiveDataFetcher
+    WebDependencies ..> MockDataFetcher
