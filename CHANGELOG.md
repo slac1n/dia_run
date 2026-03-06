@@ -1,3 +1,9 @@
+## v0.21.0 (2026-03-06)
+
+### Feat
+
+- visualise code structure with Mermaid class diagram (#41)
+
 ## v0.20.0 (2026-03-05)
 
 ### Feat
