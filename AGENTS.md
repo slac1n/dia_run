@@ -184,3 +184,31 @@ tests/
 - `src/dia_run/data_processing/data_processing.py` — Core business logic
 - `src/dia_run/data_models/schemas.py` — All Pandera schemas
 - `tests/conftest.py` — Test data setup (Delta Lake tables in tmpdir)
+
+## Architecture Diagram
+
+A Mermaid class diagram is maintained at **`docs/diagram.mmd`**. It is a living document that must stay in sync with the codebase.
+
+### What the diagram covers
+
+- All classes, Pydantic models, Pandera `DataFrameModel` schemas, Protocols, and StrEnums defined under `src/dia_run/`
+- Key properties/fields and public methods for each class
+- Function-only modules (e.g. chart modules, web routes) represented as `<<module>>` stereotyped classes listing their public functions
+- Relationships: inheritance (`--|>`), composition (`*--`), protocol implementation (`..|>`), and dependency (`..>` / `-->`)
+
+### When to update `docs/diagram.mmd`
+
+You **must** update the diagram whenever any of the following structural changes are made to files under `src/dia_run/`:
+
+1. A **class, schema, enum, or protocol** is added, removed, or renamed
+2. A **public method or property** is added, removed, or has its signature changed on any class
+3. A **field/attribute** is added or removed from a Pydantic model, DataFrameModel schema, or dataclass
+4. A **relationship** between classes changes (new dependency, changed inheritance, new composition)
+5. A **new module** is created or an existing module is deleted
+6. A **function-only module** gains or loses a public function
+
+### How to update
+
+1. Open `docs/diagram.mmd` and apply the structural change (add/remove/rename the class, method, field, or relationship)
+2. Ensure the Mermaid syntax is valid — the file should be renderable with: `mmdc -i docs/diagram.mmd -o docs/diagram.svg`
+3. Commit the updated `docs/diagram.mmd` alongside the code change that triggered the update
