@@ -24,6 +24,10 @@ data/
 
 # environment variables
 .env
+.env.prod
 
 # login data
 logindata.json
+
+# runtime secrets
+secrets/

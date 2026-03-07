@@ -1,4 +1,6 @@
 import json
+from collections.abc import Generator
+from unittest.mock import MagicMock
 
 import polars as pl
 import pytest
@@ -6,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from dia_run.data_models.paths import DataPaths
 from dia_run.web.app import app
-from dia_run.web.dependencies import get_data_paths
+from dia_run.web.dependencies import get_data_paths, get_s3_sync_service
 
 
 @pytest.fixture
@@ -47,7 +49,7 @@ def web_data_paths(
 
 
 @pytest.fixture
-def client(*, web_data_paths: DataPaths) -> TestClient:
+def client(*, web_data_paths: DataPaths) -> Generator[TestClient, None, None]:
     app.dependency_overrides[get_data_paths] = lambda: web_data_paths
     with TestClient(app) as test_client:
         yield test_client
@@ -93,3 +95,27 @@ def test_questionnaire_submission(*, client: TestClient, web_data_paths: DataPat
 
     assert len(saved["pre_run"]) == 1
     assert len(saved["fueling_during_run"]) == 1
+
+
+def test_questionnaire_submission_triggers_s3_sync(*, client: TestClient, web_data_paths: DataPaths) -> None:
+    questionnaire_path = web_data_paths.questionnaire / "1002.json"
+    questionnaire_path.unlink(missing_ok=True)
+    sync_service = MagicMock()
+    app.dependency_overrides[get_s3_sync_service] = lambda: sync_service
+
+    try:
+        response = client.post(
+            "/questionnaire/1002",
+            data={
+                "pre_run_carbohydrates_g": "30",
+                "pre_run_time_before_start_min": "-30",
+                "pre_run_bolus_percentage": "70",
+                "pre_run_food_type": "Energy Bar",
+            },
+            follow_redirects=False,
+        )
+    finally:
+        app.dependency_overrides.pop(get_s3_sync_service, None)
+
+    assert response.status_code == 303
+    sync_service.sync_to_s3_after_questionnaire.assert_called_once_with()

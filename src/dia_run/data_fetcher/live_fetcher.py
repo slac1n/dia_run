@@ -11,6 +11,7 @@ from dia_run.data_fetcher.strava_client import get_strava_client, stream_last_ac
 from dia_run.data_models.api_responses import CareLinkResponse, StravaActivitySummary, StravaStreamData
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.schemas import SpecificCarelinkSchema
+from dia_run.settings import settings
 
 
 class LiveDataFetcher:
@@ -167,7 +168,7 @@ class LiveDataFetcher:
             logger.info(f"Activity with id={self.latest_activity_id} already exists in the data")
             return None
 
-        client = CareLinkClient(tokenFile="logindata.json")
+        client = CareLinkClient(tokenFile=str(settings.carelink_token_file))
         if client.init():
             client.printUserInfo()
             carelink_data = client.getRecentData()

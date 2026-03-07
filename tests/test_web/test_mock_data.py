@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import polars as pl
 import pytest
@@ -11,7 +11,7 @@ from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.schemas import SpecificCarelinkSchema
 from dia_run.settings import AppSettings
 from dia_run.web.app import app
-from dia_run.web.dependencies import get_data_fetcher_service, get_data_paths
+from dia_run.web.dependencies import get_data_fetcher_service, get_data_paths, get_s3_sync_service
 
 
 class TestAppSettings:
@@ -34,10 +34,21 @@ class TestGetDataPaths:
     def test_returns_default_paths_when_mock_disabled(self) -> None:
         with patch("dia_run.web.dependencies.settings") as mock_settings:
             mock_settings.use_mock_data = False
+            mock_settings.data_root = Path("data")
             from dia_run.web.dependencies import get_data_paths
 
             paths = get_data_paths()
         assert paths.strava_summary == Path("data") / "strava" / "summary"
+
+    def test_returns_configured_root_when_mock_disabled(self) -> None:
+        with patch("dia_run.web.dependencies.settings") as mock_settings:
+            mock_settings.use_mock_data = False
+            mock_settings.data_root = Path("/srv/dia-run-data")
+            from dia_run.web.dependencies import get_data_paths
+
+            paths = get_data_paths()
+        assert paths.data_root == Path("/srv/dia-run-data")
+        assert paths.questionnaire == Path("/srv/dia-run-data") / "run_questionnaires"
 
     def test_returns_mock_paths_when_mock_enabled(self) -> None:
         with patch("dia_run.web.dependencies.settings") as mock_settings:
@@ -181,15 +192,32 @@ class TestFetchRouteWithMockMode:
         return data_paths
 
     @pytest.fixture
-    def mock_client(self, *, mock_fetch_data_paths: DataPaths) -> TestClient:
+    def mock_client(self, *, mock_fetch_data_paths: DataPaths, request: pytest.FixtureRequest) -> TestClient:
         mock_fetcher = MockDataFetcher(data_paths=mock_fetch_data_paths)
         app.dependency_overrides[get_data_paths] = lambda: mock_fetch_data_paths
         app.dependency_overrides[get_data_fetcher_service] = lambda: mock_fetcher
-        with TestClient(app) as test_client:
-            yield test_client
-        app.dependency_overrides.clear()
+        test_client = TestClient(app)
+
+        def cleanup() -> None:
+            test_client.close()
+            app.dependency_overrides.clear()
+
+        request.addfinalizer(cleanup)
+        return test_client
 
     def test_fetch_route_uses_mock_fetcher(self, *, mock_client: TestClient) -> None:
         response = mock_client.post("/fetch", follow_redirects=False)
         assert response.status_code == 303
         assert "questionnaire" in response.headers["location"]
+
+    def test_fetch_route_triggers_s3_sync_hook(self, *, mock_client: TestClient) -> None:
+        sync_service = MagicMock()
+        app.dependency_overrides[get_s3_sync_service] = lambda: sync_service
+
+        try:
+            response = mock_client.post("/fetch", follow_redirects=False)
+        finally:
+            app.dependency_overrides.pop(get_s3_sync_service, None)
+
+        assert response.status_code == 303
+        sync_service.sync_to_s3_after_fetch.assert_called_once_with()

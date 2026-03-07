@@ -4,13 +4,15 @@ from itertools import zip_longest
 from typing import Annotated, cast
 
 import polars as pl
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from loguru import logger
 from pydantic import ValidationError
 
 from dia_run.data_models.questionnaire import QuestionnaireModel
 from dia_run.data_processing.data_processing import DataProcessor
-from dia_run.web.dependencies import get_data_processor
+from dia_run.s3_sync import S3DataSync
+from dia_run.web.dependencies import get_data_processor, get_s3_sync_service
 from dia_run.web.fetch_status import FetchStatus, get_fetch_status
 from dia_run.web.templates import templates
 
@@ -153,13 +155,22 @@ def questionnaire_form(
     )
 
 
-@router.post("/{activity_id}", response_class=HTMLResponse)
+def _sync_questionnaire_to_s3(*, sync_service: S3DataSync) -> None:
+    try:
+        sync_service.sync_to_s3_after_questionnaire()
+    except ValueError as exc:
+        logger.error("S3 sync after questionnaire failed: {error}", error=str(exc))
+
+
+@router.post("/{activity_id}", response_class=HTMLResponse, response_model=None)
 async def submit_questionnaire(
     request: Request,
     *,
     activity_id: int,
+    background_tasks: BackgroundTasks,
     data_processor: Annotated[DataProcessor, Depends(get_data_processor)],
-) -> HTMLResponse:
+    sync_service: Annotated[S3DataSync, Depends(get_s3_sync_service)],
+) -> HTMLResponse | RedirectResponse:
     data_paths = data_processor.data_paths
     data_paths.questionnaire.mkdir(parents=True, exist_ok=True)
     df_summary = data_processor.get_summary()
@@ -282,5 +293,7 @@ async def submit_questionnaire(
 
     with open(questionnaire_path, "w") as f:
         json.dump(questionnaire.model_dump(mode="json"), f, indent=2)
+
+    background_tasks.add_task(_sync_questionnaire_to_s3, sync_service=sync_service)
 
     return RedirectResponse(url=f"/activities/{activity_id}", status_code=303)
