@@ -1,5 +1,13 @@
 # Development Guide
 
+## Branching Workflow
+
+- Cut all feature branches from `develop`.
+- Open feature PRs into `develop`; the `Tests` workflow runs there.
+- Treat `main` as the production branch.
+- Promote changes by opening a `develop` -> `main` PR; that merge is the deployment trigger.
+- Do not push directly to `develop` or `main`.
+
 ## Mock Data Mode
 
 Mock data mode lets you run the full application locally without real Strava or CareLink API credentials. No real API calls are made and the `./data` folder is completely untouched.
