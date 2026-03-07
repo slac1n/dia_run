@@ -73,7 +73,6 @@ Clone the repo:
 ```bash
 git clone git@github.com:slac1n/dia_run.git
 cd dia_run
-git checkout feat/TG-28-deploy-dockerized-application-to-aws-lightsail-pro
 ```
 
 ## 5. Configure WireGuard
