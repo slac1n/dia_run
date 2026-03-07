@@ -21,7 +21,9 @@ This guide describes the production deployment for Dia-Run on an Amazon Lightsai
 
 ## 2. Harden SSH
 
-Copy your admin SSH public key to the instance, then update `/etc/ssh/sshd_config`:
+If you uploaded your admin SSH public key during Lightsail instance creation and already logged in successfully, you do not need to copy that same key again. Only add a key manually if you are adding another admin device or rotating keys.
+
+Then update `/etc/ssh/sshd_config`:
 
 ```text
 PasswordAuthentication no
@@ -85,7 +87,6 @@ Example server config at `/etc/wireguard/wg0.conf`:
 Address = 10.44.0.1/24
 ListenPort = 51820
 PrivateKey = <server-private-key>
-SaveConfig = true
 
 [Peer]
 PublicKey = <laptop-public-key>
@@ -95,6 +96,8 @@ AllowedIPs = 10.44.0.2/32
 PublicKey = <mobile-public-key>
 AllowedIPs = 10.44.0.3/32
 ```
+
+Do not use `SaveConfig = true` for this setup. It can rewrite `wg0.conf` on restart and persist transient client `Endpoint` values learned at runtime. The server should usually keep only each peer's `PublicKey` and private WireGuard IP in `AllowedIPs`.
 
 Start WireGuard:
 
@@ -120,7 +123,13 @@ Place these files on the server:
 - `secrets/logindata.json`
 - `secrets/strava-refresh-token.txt`
 
-Create `.env.prod` in the repository root:
+Create `.env.prod` in the repository root. You can copy `.env.prod.example` and fill in the secrets:
+
+```bash
+cp .env.prod.example .env.prod
+```
+
+Example `.env.prod`:
 
 ```dotenv
 APP_ENV=production
@@ -134,30 +143,68 @@ CLIENT_SECRET=<strava-client-secret>
 
 S3_SYNC_ENABLED=true
 S3_BUCKET=<shared-bucket-name>
-S3_PREFIX=dia-run
+S3_PREFIX=
 S3_SYNC_ON_STARTUP=true
 S3_SYNC_AFTER_FETCH=true
 S3_SYNC_AFTER_QUESTIONNAIRE=true
 AWS_REGION=<bucket-region>
+AWS_ACCESS_KEY_ID=<iam-access-key-id>
+AWS_SECRET_ACCESS_KEY=<iam-secret-access-key>
+AWS_PAGER=
 
 UVICORN_HOST=10.44.0.1
 UVICORN_PORT=8000
 ```
 
+Leave `S3_PREFIX` empty if you want to sync against the bucket root.
+
 `.env.prod` must never be committed.
 
 ## 7. Configure AWS Credentials
 
-Preferred approach: use instance credentials provided to the Lightsail host through the standard AWS credential chain.
+Standard Lightsail instances do not provide EC2-style instance-profile credentials for normal Amazon S3 access. Use a dedicated IAM user with least-privilege access to the target bucket and provide its access key to the production container via `.env.prod`.
+
+Recommended IAM policy for bucket-root sync:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListDiaRunBucket",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::<shared-bucket-name>"
+    },
+    {
+      "Sid": "ReadWriteDiaRunBucketObjects",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::<shared-bucket-name>/*"
+    }
+  ]
+}
+```
+
+The host AWS CLI can also be configured for troubleshooting, but the application itself needs credentials inside the container. The easiest path is to set these in `.env.prod`:
+
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_REGION`
+- `AWS_PAGER=`
 
 Verify on the server:
 
 ```bash
 aws sts get-caller-identity
 aws s3 ls "s3://<shared-bucket-name>/"
+docker compose -f docker-compose.prod.yml run --rm web aws sts get-caller-identity
+docker compose -f docker-compose.prod.yml run --rm web aws s3 ls "s3://<shared-bucket-name>/"
 ```
-
-If Lightsail cannot provide instance credentials in your setup, use another AWS CLI credential-chain source outside git. The application only requires standard `aws s3 sync` access.
 
 ## 8. Deploy the Application
 
