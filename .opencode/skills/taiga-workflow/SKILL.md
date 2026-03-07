@@ -36,13 +36,13 @@ Confirm to the user that the status was updated.
 
 ### 3. Create the feature branch
 
-The branch name is already provided in the prompt. First, ensure you are on the latest `main` branch:
+The branch name is already provided in the prompt. First, ensure you are on the latest `develop` branch:
 
 ```
-git checkout main && git pull origin main
+git checkout develop && git pull origin develop
 ```
 
-Then create and checkout the feature branch:
+Then create and checkout the feature branch from `develop`:
 
 ```
 git checkout -b <branch-name>
