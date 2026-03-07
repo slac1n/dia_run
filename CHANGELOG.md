@@ -1,3 +1,9 @@
+## v0.22.0 (2026-03-07)
+
+### Feat
+
+- **TG-28**: add Lightsail production deployment support (#42)
+
 ## v0.21.0 (2026-03-06)
 
 ### Feat
