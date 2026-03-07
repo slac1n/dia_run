@@ -6,7 +6,19 @@ classDiagram
     %% ──────────────────────────────────────────────
 
     class AppSettings {
+        +Literal app_env
         +bool use_mock_data
+        +Path data_root
+        +Path carelink_token_file
+        +Path | None strava_refresh_token_file
+        +bool s3_sync_enabled
+        +str | None s3_bucket
+        +str s3_prefix
+        +bool s3_sync_on_startup
+        +bool s3_sync_after_fetch
+        +bool s3_sync_after_questionnaire
+        +str | None aws_region
+        +is_production() bool
     }
 
     %% ──────────────────────────────────────────────
@@ -14,10 +26,12 @@ classDiagram
     %% ──────────────────────────────────────────────
 
     class DataPaths {
+        +Path | None data_root
         +Path strava_summary
         +Path strava_stream
         +Path carelink
         +Path questionnaire
+        +from_root(root) DataPaths
     }
 
     class RunType {
@@ -329,9 +343,18 @@ classDiagram
         +ask_me() None
     }
 
+    class S3DataSync {
+        +sync_from_s3_on_startup() None
+        +sync_to_s3_after_fetch() None
+        +sync_to_s3_after_questionnaire() None
+        +sync_from_s3() None
+        +sync_to_s3(reason) None
+    }
+
     LiveDataFetcher ..|> DataFetcherService
     MockDataFetcher ..|> DataFetcherService
     LiveDataFetcher --> DataPaths
+    LiveDataFetcher ..> AppSettings
     LiveDataFetcher --> CareLinkClient
     LiveDataFetcher --> StravaActivitySummary
     LiveDataFetcher --> StravaStreamData
@@ -339,6 +362,8 @@ classDiagram
     MockDataFetcher --> DataPaths
     RunFuelQuestionnaire --> DataPaths
     RunFuelQuestionnaire --> QuestionnaireModel
+    S3DataSync --> DataPaths
+    S3DataSync ..> AppSettings
 
     %% ──────────────────────────────────────────────
     %% Dashboard – Chart Functions
@@ -405,6 +430,7 @@ classDiagram
         +get_data_paths() DataPaths
         +get_data_processor(data_paths) DataProcessor
         +get_data_fetcher_service(data_paths) DataFetcherService
+        +get_s3_sync_service(data_paths) S3DataSync
     }
 
     WebDependencies ..> AppSettings
@@ -413,3 +439,4 @@ classDiagram
     WebDependencies ..> DataFetcherService
     WebDependencies ..> LiveDataFetcher
     WebDependencies ..> MockDataFetcher
+    WebDependencies ..> S3DataSync

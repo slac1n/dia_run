@@ -77,6 +77,14 @@ Open http://localhost:8000
 
 Ensure `.env` and `logindata.json` exist locally so the container can authenticate with Strava and CareLink.
 
+### Production Deployment
+Production deployment targets AWS Lightsail with Docker Compose, WireGuard-only access, and S3-backed `./data` sync.
+
+- Use `docker-compose.prod.yml` for the production container.
+- Keep production secrets in `.env.prod` on the server; do not commit it.
+- Mount runtime secrets such as `logindata.json` and the Strava refresh token through `./secrets/` on the server.
+- Follow the full provisioning, VPN, deploy, and recovery guide in `docs/lightsail_deployment.md`.
+
 ## AWS Backup
 ```
 aws s3 sync ./data s3://dia-run-bucket/ --profile personal --exclude "*/.DS_Store"
