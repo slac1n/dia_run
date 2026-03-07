@@ -6,7 +6,7 @@ DEFAULT_DATA_ROOT = Path("data")
 
 
 class DataPaths(BaseModel):
-    data_root: Path | None = None
+    data_root: Path = DEFAULT_DATA_ROOT
     strava_summary: Path = DEFAULT_DATA_ROOT / "strava" / "summary"
     strava_stream: Path = DEFAULT_DATA_ROOT / "strava" / "stream"
     carelink: Path = DEFAULT_DATA_ROOT / "carelink"

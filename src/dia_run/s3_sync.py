@@ -38,9 +38,6 @@ class S3DataSync:
         self._run_sync(source=str(data_root), destination=self._get_s3_uri(), direction=f"upload after {reason}")
 
     def _get_data_root(self) -> Path:
-        if self.data_paths.data_root is None:
-            msg = "S3 sync requires DataPaths created with DataPaths.from_root(...)"
-            raise ValueError(msg)
         return self.data_paths.data_root
 
     def _get_s3_uri(self) -> str:

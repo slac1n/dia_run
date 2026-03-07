@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
@@ -16,7 +17,7 @@ STATIC_DIR = WEB_ROOT / "static"
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     sync_service = S3DataSync(data_paths=get_data_paths())
-    sync_service.sync_from_s3_on_startup()
+    await asyncio.to_thread(sync_service.sync_from_s3_on_startup)
     yield
 
 
