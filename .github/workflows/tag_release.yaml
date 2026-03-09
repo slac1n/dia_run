@@ -1,0 +1,50 @@
+name: Tag release
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: tag-main-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  tag_release:
+    runs-on: ubuntu-latest
+    name: Tag main release
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: release
+        name: Read release version
+        run: |
+          version=$(python3 -c "import tomllib; from pathlib import Path; print(tomllib.loads(Path('pyproject.toml').read_text())['project']['version'])")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - id: tag_exists
+        name: Check whether tag already exists
+        run: |
+          if git rev-parse "${{ steps.release.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create release tag
+        if: steps.tag_exists.outputs.exists == 'false'
+        run: |
+          git tag "${{ steps.release.outputs.tag }}" "$GITHUB_SHA"
+          git push origin "${{ steps.release.outputs.tag }}"
+
+      - name: Report existing tag
+        if: steps.tag_exists.outputs.exists == 'true'
+        run: echo "Tag ${{ steps.release.outputs.tag }} already exists."

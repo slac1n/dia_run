@@ -146,7 +146,7 @@ class TestNewFeature:
 
 - **Conventional Commits** enforced via commitizen: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`
 - Semver versioning with tag format `v$version`
-- CI auto-bumps version and generates changelog on push to `main`
+- CI validates PRs into `main`, and tags `main` on release promotion from `release/*` or `hotfix/*`
 - Commit message in bump: `release $current_version -> $new_version [commitizen-skip-ci]`
 
 ## Project Structure

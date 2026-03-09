@@ -1,0 +1,74 @@
+name: Validate main promotion
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate_main_promotion:
+    runs-on: ubuntu-latest
+    name: Validate main promotion
+
+    steps:
+      - name: Validate source branch
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          case "$HEAD_REF" in
+            release/*)
+              echo "Promoting release branch into main."
+              ;;
+            hotfix/*)
+              echo "Promoting hotfix branch into main."
+              ;;
+            *)
+              echo "Only 'release/*' or 'hotfix/*' branches may target main. Received '$HEAD_REF'."
+              exit 1
+              ;;
+          esac
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate release metadata
+        run: |
+          git fetch origin main
+
+          changed_files=$(git diff --name-only origin/main...HEAD)
+          case "$changed_files" in
+            *pyproject.toml*) ;;
+            *)
+              echo "Release and hotfix PRs into main must include a version bump in pyproject.toml."
+              exit 1
+              ;;
+          esac
+
+          case "$changed_files" in
+            *uv.lock*) ;;
+            *)
+              echo "Release and hotfix PRs into main must include the matching uv.lock version update."
+              exit 1
+              ;;
+          esac
+
+          case "$changed_files" in
+            *CHANGELOG.md*) ;;
+            *)
+              echo "Release and hotfix PRs into main must update CHANGELOG.md."
+              exit 1
+              ;;
+          esac
+
+          base_version=$(git show origin/main:pyproject.toml | python3 -c "import sys, tomllib; print(tomllib.loads(sys.stdin.read())['project']['version'])")
+          head_version=$(python3 -c "import tomllib; from pathlib import Path; print(tomllib.loads(Path('pyproject.toml').read_text())['project']['version'])")
+
+          if [ "$base_version" = "$head_version" ]; then
+            echo "Release and hotfix PRs into main must bump the version before release."
+            exit 1
+          fi
