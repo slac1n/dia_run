@@ -275,6 +275,7 @@ classDiagram
         -DataFrame | None df_summary
         +get_summary() DataFrame~SummarySchema~
         +get_30_day_kpis(reference_date) KpiModel
+        +get_pending_questionnaire_count() int
         +get_specific_carelink(activity_id, start_datetime, end_datetime) DataFrame~SpecificCarelinkSchema~
         +get_questionnaire(activity_id) QuestionnaireModel
         +get_pre_run_nutrition_summary() DataFrame~PreRunNutritionSummarySchema~
@@ -297,6 +298,21 @@ classDiagram
     DataProcessor ..> FuelingGlucoseWindowSchema : returns
     DataProcessor ..> FuelingImpactSchema : returns
     DataProcessor ..> BasalAdjustmentTirSchema : returns
+
+    class DashboardOverviewData {
+        +DataFrame summary
+        +KpiModel kpis
+        +int pending_questionnaires
+    }
+
+    class OverviewDataService {
+        +get_dashboard_data() DashboardOverviewData
+        +invalidate() None
+    }
+
+    OverviewDataService --> DataPaths
+    OverviewDataService --> DataProcessor
+    OverviewDataService --> DashboardOverviewData
 
     %% ──────────────────────────────────────────────
     %% Data Fetcher
@@ -429,6 +445,7 @@ classDiagram
         <<module: web.dependencies>>
         +get_data_paths() DataPaths
         +get_data_processor(data_paths) DataProcessor
+        +get_overview_service(data_paths) OverviewPageService
         +get_data_fetcher_service(data_paths) DataFetcherService
         +get_s3_sync_service(data_paths) S3DataSync
     }
@@ -436,7 +453,23 @@ classDiagram
     WebDependencies ..> AppSettings
     WebDependencies ..> DataPaths
     WebDependencies ..> DataProcessor
+    WebDependencies ..> OverviewPageService
     WebDependencies ..> DataFetcherService
     WebDependencies ..> LiveDataFetcher
     WebDependencies ..> MockDataFetcher
     WebDependencies ..> S3DataSync
+
+    class DashboardOverviewContext {
+        +list~dict~ kpi_cards
+        +dict charts
+        +int pending_questionnaires
+    }
+
+    class OverviewPageService {
+        +get_dashboard_context() DashboardOverviewContext
+        +invalidate() None
+    }
+
+    OverviewPageService --> DataPaths
+    OverviewPageService --> OverviewDataService
+    OverviewPageService --> DashboardOverviewContext

@@ -11,9 +11,11 @@ from pydantic import ValidationError
 
 from dia_run.data_models.questionnaire import QuestionnaireModel
 from dia_run.data_processing.data_processing import DataProcessor
+from dia_run.data_processing.overview_data import invalidate_overview_data_service
 from dia_run.s3_sync import S3DataSync
 from dia_run.web.dependencies import get_data_processor, get_s3_sync_service
 from dia_run.web.fetch_status import FetchStatus, get_fetch_status
+from dia_run.web.services.overview_page import invalidate_overview_page_service
 from dia_run.web.templates import templates
 
 router = APIRouter(prefix="/questionnaire")
@@ -294,6 +296,8 @@ async def submit_questionnaire(
     with open(questionnaire_path, "w") as f:
         json.dump(questionnaire.model_dump(mode="json"), f, indent=2)
 
+    invalidate_overview_data_service(data_paths=data_paths)
+    invalidate_overview_page_service(data_paths=data_paths)
     background_tasks.add_task(_sync_questionnaire_to_s3, sync_service=sync_service)
 
     return RedirectResponse(url=f"/activities/{activity_id}", status_code=303)
