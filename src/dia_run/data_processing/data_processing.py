@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timedelta
-from typing import TypeVar, cast
+from typing import Any, TypeVar, cast
 
 import polars as pl
 from pandera import check_types
@@ -30,6 +30,19 @@ from dia_run.data_models.schemas import (
 T = TypeVar("T")
 U = TypeVar("U")
 V = TypeVar("V")
+
+
+def _typed(df: pl.DataFrame | pl.LazyFrame) -> Any:
+    """Return *df* with a Pandera ``DataFrame[Schema]`` / ``LazyFrame[Schema]`` type.
+
+    Pandera's generic wrappers are typing-only; at runtime a validated
+    ``pl.DataFrame`` already *is* the correct value.  This one-liner
+    centralises the ``Any`` escape-hatch so individual return sites stay
+    free of ``# type: ignore`` comments.
+    """
+    return df
+
+
 PRE_RUN_INSULIN_MINUTES = 180
 EASY_KEYWORD = RunType.get_keyword(RunType.EASY) or ""
 INTERVAL_KEYWORD = RunType.get_keyword(RunType.INTERVAL) or ""
@@ -61,7 +74,7 @@ class DataProcessor:
             lf_summary = self._join_data(lf_left=lf_summary, lf_right=lf_agg_insulin_on_board)
             self.df_summary = cast(pl.DataFrame, lf_summary.collect())
 
-        return self.df_summary  # type: ignore[return-value]
+        return _typed(self.df_summary)
 
     def get_30_day_kpis(self, *, reference_date: datetime | None = None) -> KpiModel:
         df_summary = cast(pl.DataFrame, self.get_summary())
@@ -110,7 +123,7 @@ class DataProcessor:
     def get_specific_carelink(
         self, *, activity_id: int, start_datetime: datetime, end_datetime: datetime
     ) -> DataFrame[SpecificCarelinkSchema]:
-        return (
+        result = (
             pl.scan_delta(str(self.data_paths.carelink))
             .filter(
                 (pl.col("datetime") >= start_datetime - pl.duration(minutes=PRE_RUN_INSULIN_MINUTES))
@@ -126,7 +139,8 @@ class DataProcessor:
             )
             .drop("activity_id")
             .collect()
-        )  # type: ignore[return-value]
+        )
+        return _typed(result)
 
     def get_questionnaire(self, activity_id: int) -> QuestionnaireModel:
         return self._get_questionnaire_cache().get(activity_id, QuestionnaireModel())
@@ -134,7 +148,7 @@ class DataProcessor:
     @check_types
     def get_pre_run_nutrition_summary(self) -> DataFrame[PreRunNutritionSummarySchema]:
         if self.df_pre_run_nutrition_summary is not None:
-            return self.df_pre_run_nutrition_summary  # type: ignore[return-value]
+            return _typed(self.df_pre_run_nutrition_summary)
 
         df_summary = cast(pl.DataFrame, self.get_summary())
         questionnaires = self._get_questionnaire_cache()
@@ -181,15 +195,15 @@ class DataProcessor:
                     "name_date": pl.Utf8,
                 }
             )
-            return self.df_pre_run_nutrition_summary  # type: ignore[return-value]
+            return _typed(self.df_pre_run_nutrition_summary)
 
         self.df_pre_run_nutrition_summary = pl.DataFrame(nutrition_rows)
-        return self.df_pre_run_nutrition_summary  # type: ignore[return-value]
+        return _typed(self.df_pre_run_nutrition_summary)
 
     @check_types
     def get_heartrate_streams(self) -> DataFrame[HeartrateStreamsSchema]:
         if self.df_heartrate_streams is not None:
-            return self.df_heartrate_streams  # type: ignore[return-value]
+            return _typed(self.df_heartrate_streams)
 
         lf_summary = self._load_summary_data()
         self.df_heartrate_streams = (
@@ -198,16 +212,16 @@ class DataProcessor:
             .join(lf_summary.select(["activity_id", "run_type"]), on="activity_id", how="left")
             .select(pl.exclude("activity_id"))
         ).collect()
-        return self.df_heartrate_streams  # type: ignore[return-value]
+        return _typed(self.df_heartrate_streams)
 
     @check_types
     def get_glucose_streams(self) -> DataFrame[GlucoseStreamsSchema]:
         if self.df_glucose_streams is not None:
-            return self.df_glucose_streams  # type: ignore[return-value]
+            return _typed(self.df_glucose_streams)
 
         lf_summary = self._load_summary_data()
         self.df_glucose_streams = self._load_glucose_data(lf_summary).drop("activity_id").collect()
-        return self.df_glucose_streams  # type: ignore[return-value]
+        return _typed(self.df_glucose_streams)
 
     FUELING_WINDOW_MINUTES = 45
     PRE_INTAKE_WINDOW_MINUTES = 15
@@ -215,7 +229,7 @@ class DataProcessor:
     @check_types
     def get_fueling_glucose_windows(self) -> DataFrame[FuelingGlucoseWindowSchema]:
         if self.df_fueling_glucose_windows is not None:
-            return self.df_fueling_glucose_windows  # type: ignore[return-value]
+            return _typed(self.df_fueling_glucose_windows)
 
         df_summary = cast(pl.DataFrame, self.get_summary())
         questionnaires = self._get_questionnaire_cache()
@@ -278,15 +292,15 @@ class DataProcessor:
                     "value": pl.Float64,
                 }
             )
-            return self.df_fueling_glucose_windows  # type: ignore[return-value]
+            return _typed(self.df_fueling_glucose_windows)
 
         self.df_fueling_glucose_windows = pl.DataFrame(window_rows)
-        return self.df_fueling_glucose_windows  # type: ignore[return-value]
+        return _typed(self.df_fueling_glucose_windows)
 
     @check_types
     def get_fueling_impact(self) -> DataFrame[FuelingImpactSchema]:
         if self.df_fueling_impact is not None:
-            return self.df_fueling_impact  # type: ignore[return-value]
+            return _typed(self.df_fueling_impact)
 
         df_summary = cast(pl.DataFrame, self.get_summary())
         df_windows = cast(pl.DataFrame, self.get_fueling_glucose_windows())
@@ -362,7 +376,7 @@ class DataProcessor:
                     "name_date": pl.Utf8,
                 }
             )
-            return self.df_fueling_impact  # type: ignore[return-value]
+            return _typed(self.df_fueling_impact)
 
         self.df_fueling_impact = pl.DataFrame(impact_rows).cast(
             {
@@ -372,12 +386,12 @@ class DataProcessor:
                 "time_to_peak_min": pl.Float64,
             }
         )
-        return self.df_fueling_impact  # type: ignore[return-value]
+        return _typed(self.df_fueling_impact)
 
     @check_types
     def get_basal_adjustment_tir(self) -> DataFrame[BasalAdjustmentTirSchema]:
         if self.df_basal_adjustment_tir is not None:
-            return self.df_basal_adjustment_tir  # type: ignore[return-value]
+            return _typed(self.df_basal_adjustment_tir)
 
         df_summary = cast(pl.DataFrame, self.get_summary())
         questionnaires = self._get_questionnaire_cache()
@@ -465,7 +479,7 @@ class DataProcessor:
                     "name_date": pl.Utf8,
                 }
             )
-            return self.df_basal_adjustment_tir  # type: ignore[return-value]
+            return _typed(self.df_basal_adjustment_tir)
 
         self.df_basal_adjustment_tir = pl.DataFrame(tir_rows).cast(
             {
@@ -474,7 +488,7 @@ class DataProcessor:
                 "covered_minutes": pl.Float64,
             }
         )
-        return self.df_basal_adjustment_tir  # type: ignore[return-value]
+        return _typed(self.df_basal_adjustment_tir)
 
     def _get_baseline_glucose(self, *, activity_id: int, fueling_datetime: datetime) -> float | None:
         df_cgm = self._get_cgm_by_activity().get(activity_id)
@@ -491,7 +505,7 @@ class DataProcessor:
             (pl.col("datetime") - fueling_datetime).dt.total_seconds().abs().alias("time_diff")
         )
         nearest = df_cgm.sort("time_diff").head(1)
-        return nearest["value"].item()  # type: ignore[return-value]
+        return float(nearest["value"].item())
 
     def _load_summary_data(self) -> LazyFrame[StravaSummarySchema]:
         return cast(
@@ -653,8 +667,10 @@ class DataProcessor:
         return self._questionnaire_cache
 
     def _join_data(self, *, lf_left: LazyFrame[T], lf_right: LazyFrame[U]) -> LazyFrame[V]:
-        return lf_left.join(
-            lf_right,
-            on="activity_id",
-            how="left",
-        )  # type: ignore[return-value]
+        return _typed(
+            lf_left.join(
+                lf_right,
+                on="activity_id",
+                how="left",
+            )
+        )

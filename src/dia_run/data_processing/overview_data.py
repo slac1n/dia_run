@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
 from threading import Lock
 from time import perf_counter
 
@@ -12,50 +11,62 @@ from dia_run.data_models.paths import DataPaths
 from dia_run.data_processing.data_processing import DataProcessor
 
 
+def get_data_paths_key(*, data_paths: DataPaths) -> tuple[str, ...]:
+    return (
+        str(data_paths.strava_summary.resolve()),
+        str(data_paths.strava_stream.resolve()),
+        str(data_paths.carelink.resolve()),
+        str(data_paths.questionnaire.resolve()),
+    )
+
+
 @dataclass(frozen=True)
 class DashboardOverviewData:
     summary: pl.DataFrame
     kpis: KpiModel
     pending_questionnaires: int
+    data_processor: DataProcessor
 
 
 class OverviewDataService:
     def __init__(self, *, data_paths: DataPaths) -> None:
         self.data_paths = data_paths
-        self._cache_lock = Lock()
-        self._cache_generation = 0
-        self._cached_key: tuple[object, ...] | None = None
+        self._lock = Lock()
+        self._generation = 0
+        self._cached_generation: int | None = None
+        self._cached_date: str | None = None
         self._cached_data: DashboardOverviewData | None = None
 
     def get_dashboard_data(self) -> DashboardOverviewData:
         reference_datetime = datetime.now()
-        cache_key = self._build_cache_key(reference_datetime=reference_datetime)
+        today = reference_datetime.date().isoformat()
 
-        with self._cache_lock:
-            if self._cached_key == cache_key and self._cached_data is not None:
+        with self._lock:
+            if (
+                self._cached_data is not None
+                and self._cached_generation == self._generation
+                and self._cached_date == today
+            ):
                 logger.debug("Serving cached dashboard data for data root {}", self.data_paths.data_root)
                 return self._cached_data
+            generation_snapshot = self._generation
 
-            dashboard_data = self._build_dashboard_data(reference_datetime=reference_datetime)
-            self._cached_key = cache_key
-            self._cached_data = dashboard_data
-            return dashboard_data
+        dashboard_data = self._build_dashboard_data(reference_datetime=reference_datetime)
+
+        with self._lock:
+            if self._generation == generation_snapshot:
+                self._cached_generation = generation_snapshot
+                self._cached_date = today
+                self._cached_data = dashboard_data
+
+        return dashboard_data
 
     def invalidate(self) -> None:
-        with self._cache_lock:
-            self._cache_generation += 1
-            self._cached_key = None
+        with self._lock:
+            self._generation += 1
+            self._cached_generation = None
+            self._cached_date = None
             self._cached_data = None
-
-    def _build_cache_key(self, *, reference_datetime: datetime) -> tuple[object, ...]:
-        return (
-            self._cache_generation,
-            reference_datetime.date().isoformat(),
-            self._get_delta_log_signature(path=self.data_paths.strava_summary),
-            self._get_delta_log_signature(path=self.data_paths.strava_stream),
-            self._get_delta_log_signature(path=self.data_paths.carelink),
-            self._get_directory_signature(path=self.data_paths.questionnaire),
-        )
 
     def _build_dashboard_data(self, *, reference_datetime: datetime) -> DashboardOverviewData:
         build_started = perf_counter()
@@ -72,26 +83,8 @@ class OverviewDataService:
             summary=summary,
             kpis=kpis,
             pending_questionnaires=pending_questionnaires,
+            data_processor=data_processor,
         )
-
-    def _get_delta_log_signature(self, *, path: Path) -> tuple[int, int]:
-        return self._get_directory_signature(path=path / "_delta_log")
-
-    def _get_directory_signature(self, *, path: Path) -> tuple[int, int]:
-        if not path.exists():
-            return (0, 0)
-
-        latest_mtime_ns = path.stat().st_mtime_ns
-        file_count = 0
-        for child in path.rglob("*"):
-            if not child.is_file():
-                continue
-
-            child_stat = child.stat()
-            file_count += 1
-            latest_mtime_ns = max(latest_mtime_ns, child_stat.st_mtime_ns)
-
-        return (file_count, latest_mtime_ns)
 
 
 _OVERVIEW_DATA_SERVICES: dict[tuple[str, ...], OverviewDataService] = {}
@@ -99,7 +92,7 @@ _OVERVIEW_DATA_SERVICES_LOCK = Lock()
 
 
 def get_overview_data_service(*, data_paths: DataPaths) -> OverviewDataService:
-    service_key = _get_service_key(data_paths=data_paths)
+    service_key = get_data_paths_key(data_paths=data_paths)
     with _OVERVIEW_DATA_SERVICES_LOCK:
         if service_key not in _OVERVIEW_DATA_SERVICES:
             _OVERVIEW_DATA_SERVICES[service_key] = OverviewDataService(data_paths=data_paths)
@@ -107,18 +100,9 @@ def get_overview_data_service(*, data_paths: DataPaths) -> OverviewDataService:
 
 
 def invalidate_overview_data_service(*, data_paths: DataPaths) -> None:
-    service_key = _get_service_key(data_paths=data_paths)
+    service_key = get_data_paths_key(data_paths=data_paths)
     with _OVERVIEW_DATA_SERVICES_LOCK:
         service = _OVERVIEW_DATA_SERVICES.get(service_key)
 
     if service is not None:
         service.invalidate()
-
-
-def _get_service_key(*, data_paths: DataPaths) -> tuple[str, ...]:
-    return (
-        str(data_paths.strava_summary.resolve()),
-        str(data_paths.strava_stream.resolve()),
-        str(data_paths.carelink.resolve()),
-        str(data_paths.questionnaire.resolve()),
-    )

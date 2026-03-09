@@ -28,7 +28,12 @@ from dia_run.dashboard.charts.run_types import (
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.run_types import RunType
 from dia_run.data_processing.data_processing import DataProcessor
-from dia_run.data_processing.overview_data import DashboardOverviewData, OverviewDataService, get_overview_data_service
+from dia_run.data_processing.overview_data import (
+    DashboardOverviewData,
+    OverviewDataService,
+    get_data_paths_key,
+    get_overview_data_service,
+)
 from dia_run.web.plotly_embed import render_plotly_figure
 
 
@@ -43,44 +48,36 @@ class OverviewPageService:
     def __init__(self, *, data_paths: DataPaths, overview_data_service: OverviewDataService) -> None:
         self.data_paths = data_paths
         self.overview_data_service = overview_data_service
-        self._cache_lock = Lock()
-        self._cached_key: tuple[object, ...] | None = None
+        self._lock = Lock()
+        self._cached_data_id: int | None = None
         self._cached_context: DashboardOverviewContext | None = None
 
     def get_dashboard_context(self) -> DashboardOverviewContext:
         dashboard_data = self.overview_data_service.get_dashboard_data()
-        cache_key = self._build_cache_key(dashboard_data=dashboard_data)
+        data_identity = id(dashboard_data)
 
-        with self._cache_lock:
-            if self._cached_key == cache_key and self._cached_context is not None:
+        with self._lock:
+            if self._cached_data_id == data_identity and self._cached_context is not None:
                 logger.debug("Serving cached dashboard overview for data root {}", self.data_paths.data_root)
                 return self._cached_context
 
-            dashboard_context = self._build_dashboard_context(dashboard_data=dashboard_data)
-            self._cached_key = cache_key
+        dashboard_context = self._build_dashboard_context(dashboard_data=dashboard_data)
+
+        with self._lock:
+            self._cached_data_id = data_identity
             self._cached_context = dashboard_context
-            return dashboard_context
+
+        return dashboard_context
 
     def invalidate(self) -> None:
-        with self._cache_lock:
-            self._cached_key = None
+        with self._lock:
+            self._cached_data_id = None
             self._cached_context = None
-
-    def _build_cache_key(self, *, dashboard_data: DashboardOverviewData) -> tuple[object, ...]:
-        return (
-            id(dashboard_data.summary),
-            dashboard_data.kpis.total_distance_km,
-            dashboard_data.kpis.total_running_time_minutes,
-            dashboard_data.kpis.avg_sensor_glucose,
-            dashboard_data.kpis.time_in_range_percentage,
-            dashboard_data.pending_questionnaires,
-        )
 
     def _build_dashboard_context(self, *, dashboard_data: DashboardOverviewData) -> DashboardOverviewContext:
         build_started = perf_counter()
-        data_processor = DataProcessor(data_paths=self.data_paths)
 
-        charts = self._build_charts(data_processor=data_processor, dashboard_data=dashboard_data)
+        charts = self._build_charts(data_processor=dashboard_data.data_processor, dashboard_data=dashboard_data)
 
         elapsed_ms = (perf_counter() - build_started) * 1000
         logger.info("Dashboard overview page cache refreshed in {:.1f} ms", elapsed_ms)
@@ -150,7 +147,7 @@ _OVERVIEW_PAGE_SERVICES_LOCK = Lock()
 
 
 def get_overview_page_service(*, data_paths: DataPaths) -> OverviewPageService:
-    service_key = _get_service_key(data_paths=data_paths)
+    service_key = get_data_paths_key(data_paths=data_paths)
     with _OVERVIEW_PAGE_SERVICES_LOCK:
         if service_key not in _OVERVIEW_PAGE_SERVICES:
             _OVERVIEW_PAGE_SERVICES[service_key] = OverviewPageService(
@@ -161,18 +158,9 @@ def get_overview_page_service(*, data_paths: DataPaths) -> OverviewPageService:
 
 
 def invalidate_overview_page_service(*, data_paths: DataPaths) -> None:
-    service_key = _get_service_key(data_paths=data_paths)
+    service_key = get_data_paths_key(data_paths=data_paths)
     with _OVERVIEW_PAGE_SERVICES_LOCK:
         service = _OVERVIEW_PAGE_SERVICES.get(service_key)
 
     if service is not None:
         service.invalidate()
-
-
-def _get_service_key(*, data_paths: DataPaths) -> tuple[str, ...]:
-    return (
-        str(data_paths.strava_summary.resolve()),
-        str(data_paths.strava_stream.resolve()),
-        str(data_paths.carelink.resolve()),
-        str(data_paths.questionnaire.resolve()),
-    )
