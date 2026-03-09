@@ -55,6 +55,47 @@ class TestDataProcessor:
         # Activity 1004: 6.17 min/km = 6:10 -> "6:10"
         assert result.filter(pl.col("activity_id") == 1004)["human_readable_pace"].item() == "6:10"
 
+    def test_get_pending_questionnaire_count(self, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        assert processor.get_pending_questionnaire_count() == 0
+
+    def test_get_pending_questionnaire_count_without_questionnaires(self, test_data_paths: DataPaths) -> None:
+        empty_questionnaire_dir = test_data_paths.questionnaire.parent / "empty_questionnaires_pending"
+        empty_questionnaire_dir.mkdir(parents=True, exist_ok=True)
+
+        empty_paths = DataPaths(
+            carelink=test_data_paths.carelink,
+            strava_summary=test_data_paths.strava_summary,
+            strava_stream=test_data_paths.strava_stream,
+            questionnaire=empty_questionnaire_dir,
+        )
+        processor = DataProcessor(empty_paths)
+
+        assert processor.get_pending_questionnaire_count() == 4
+
+    def test_data_processor_caches_expensive_results(self, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+
+        summary_first = processor.get_summary()
+        summary_second = processor.get_summary()
+        assert summary_first.equals(summary_second)
+
+        nutrition_first = processor.get_pre_run_nutrition_summary()
+        nutrition_second = processor.get_pre_run_nutrition_summary()
+        assert nutrition_first.equals(nutrition_second)
+
+        windows_first = processor.get_fueling_glucose_windows()
+        windows_second = processor.get_fueling_glucose_windows()
+        assert windows_first.equals(windows_second)
+
+        impact_first = processor.get_fueling_impact()
+        impact_second = processor.get_fueling_impact()
+        assert impact_first.equals(impact_second)
+
+        basal_first = processor.get_basal_adjustment_tir()
+        basal_second = processor.get_basal_adjustment_tir()
+        assert basal_first.equals(basal_second)
+
     def test_get_specific_carelink(self, test_data_paths: DataPaths) -> None:
         processor = DataProcessor(test_data_paths)
         activity_id = 1002

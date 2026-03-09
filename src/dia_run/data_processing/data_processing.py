@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timedelta
-from typing import TypeVar
+from typing import Any, TypeVar, cast
 
 import polars as pl
 from pandera import check_types
@@ -30,13 +30,39 @@ from dia_run.data_models.schemas import (
 T = TypeVar("T")
 U = TypeVar("U")
 V = TypeVar("V")
+
+
+def _typed(df: pl.DataFrame | pl.LazyFrame) -> Any:
+    """Return *df* with a Pandera ``DataFrame[Schema]`` / ``LazyFrame[Schema]`` type.
+
+    Pandera's generic wrappers are typing-only; at runtime a validated
+    ``pl.DataFrame`` already *is* the correct value.  This one-liner
+    centralises the ``Any`` escape-hatch so individual return sites stay
+    free of ``# type: ignore`` comments.
+    """
+    return df
+
+
 PRE_RUN_INSULIN_MINUTES = 180
+EASY_KEYWORD = RunType.get_keyword(RunType.EASY) or ""
+INTERVAL_KEYWORD = RunType.get_keyword(RunType.INTERVAL) or ""
+TEMPO_KEYWORD = RunType.get_keyword(RunType.TEMPO) or ""
+LONG_KEYWORD = RunType.get_keyword(RunType.LONG) or ""
 
 
 class DataProcessor:
-    def __init__(self, data_paths: DataPaths | None = None):
+    def __init__(self, data_paths: DataPaths | None = None) -> None:
         self.data_paths = data_paths or DataPaths()
         self.df_summary: pl.DataFrame | None = None
+        self.df_heartrate_streams: pl.DataFrame | None = None
+        self.df_glucose_streams: pl.DataFrame | None = None
+        self.df_pre_run_nutrition_summary: pl.DataFrame | None = None
+        self.df_fueling_glucose_windows: pl.DataFrame | None = None
+        self.df_fueling_impact: pl.DataFrame | None = None
+        self.df_basal_adjustment_tir: pl.DataFrame | None = None
+        self.df_cgm: pl.DataFrame | None = None
+        self._cgm_by_activity: dict[int, pl.DataFrame] | None = None
+        self._questionnaire_cache: dict[int, QuestionnaireModel] | None = None
 
     @check_types
     def get_summary(self) -> DataFrame[SummarySchema]:
@@ -46,16 +72,16 @@ class DataProcessor:
             lf_agg_insulin_on_board = self._aggregate_insulin_on_board(lf_summary)
             lf_summary = self._join_data(lf_left=lf_summary, lf_right=lf_agg_glucose)
             lf_summary = self._join_data(lf_left=lf_summary, lf_right=lf_agg_insulin_on_board)
-            self.df_summary = lf_summary.collect()
+            self.df_summary = cast(pl.DataFrame, lf_summary.collect())
 
-        return self.df_summary
+        return _typed(self.df_summary)
 
     def get_30_day_kpis(self, *, reference_date: datetime | None = None) -> KpiModel:
-        self.get_summary()
+        df_summary = cast(pl.DataFrame, self.get_summary())
         reference = reference_date or datetime.now()
         cutoff = reference - timedelta(days=30)
 
-        df_recent = self.df_summary.filter(pl.col("start_date_local") >= cutoff)  # type: ignore[union-attr]
+        df_recent = df_summary.filter(pl.col("start_date_local") >= cutoff)
 
         total_distance_km = round(df_recent["distance"].sum() / 1000, 1)
         total_running_time_minutes = int(df_recent["moving_time"].sum() // 60)
@@ -86,11 +112,18 @@ class DataProcessor:
             time_in_range_percentage=time_in_range_percentage,
         )
 
+    def get_pending_questionnaire_count(self) -> int:
+        df_summary = self.get_summary()
+        questionnaire_ids = list(self._get_questionnaire_cache().keys())
+        if questionnaire_ids:
+            return len(df_summary.filter(~pl.col("activity_id").is_in(questionnaire_ids)))
+        return len(df_summary)
+
     @check_types
     def get_specific_carelink(
         self, *, activity_id: int, start_datetime: datetime, end_datetime: datetime
     ) -> DataFrame[SpecificCarelinkSchema]:
-        return (
+        result = (
             pl.scan_delta(str(self.data_paths.carelink))
             .filter(
                 (pl.col("datetime") >= start_datetime - pl.duration(minutes=PRE_RUN_INSULIN_MINUTES))
@@ -107,18 +140,18 @@ class DataProcessor:
             .drop("activity_id")
             .collect()
         )
+        return _typed(result)
 
     def get_questionnaire(self, activity_id: int) -> QuestionnaireModel:
-        questionnaire_path = self.data_paths.questionnaire / f"{activity_id}.json"
-        if not questionnaire_path.exists():
-            return QuestionnaireModel()
-        with open(questionnaire_path) as f:
-            data = json.load(f)
-        return QuestionnaireModel.model_validate(data)
+        return self._get_questionnaire_cache().get(activity_id, QuestionnaireModel())
 
     @check_types
     def get_pre_run_nutrition_summary(self) -> DataFrame[PreRunNutritionSummarySchema]:
-        df_summary = self.get_summary()
+        if self.df_pre_run_nutrition_summary is not None:
+            return _typed(self.df_pre_run_nutrition_summary)
+
+        df_summary = cast(pl.DataFrame, self.get_summary())
+        questionnaires = self._get_questionnaire_cache()
         nutrition_rows: list[dict[str, int | float | str]] = []
 
         for row in df_summary.iter_rows(named=True):
@@ -129,11 +162,10 @@ class DataProcessor:
             if in_going_sg is None:
                 continue
 
-            questionnaire_path = self.data_paths.questionnaire / f"{activity_id}.json"
-            if not questionnaire_path.exists():
+            questionnaire = questionnaires.get(activity_id)
+            if questionnaire is None:
                 continue
 
-            questionnaire = self.get_questionnaire(activity_id)
             if not questionnaire.pre_run:
                 continue
 
@@ -153,7 +185,7 @@ class DataProcessor:
             )
 
         if not nutrition_rows:
-            return pl.DataFrame(
+            self.df_pre_run_nutrition_summary = pl.DataFrame(
                 schema={
                     "activity_id": pl.Int64,
                     "total_carbohydrates_g": pl.Int64,
@@ -163,30 +195,45 @@ class DataProcessor:
                     "name_date": pl.Utf8,
                 }
             )
+            return _typed(self.df_pre_run_nutrition_summary)
 
-        return pl.DataFrame(nutrition_rows)
+        self.df_pre_run_nutrition_summary = pl.DataFrame(nutrition_rows)
+        return _typed(self.df_pre_run_nutrition_summary)
 
     @check_types
     def get_heartrate_streams(self) -> DataFrame[HeartrateStreamsSchema]:
+        if self.df_heartrate_streams is not None:
+            return _typed(self.df_heartrate_streams)
+
         lf_summary = self._load_summary_data()
-        return (
+        self.df_heartrate_streams = (
             pl.scan_delta(str(self.data_paths.strava_stream))
             .select(["datetime", "heartrate", "activity_id"])
             .join(lf_summary.select(["activity_id", "run_type"]), on="activity_id", how="left")
             .select(pl.exclude("activity_id"))
         ).collect()
+        return _typed(self.df_heartrate_streams)
 
     @check_types
     def get_glucose_streams(self) -> DataFrame[GlucoseStreamsSchema]:
+        if self.df_glucose_streams is not None:
+            return _typed(self.df_glucose_streams)
+
         lf_summary = self._load_summary_data()
-        return self._load_glucose_data(lf_summary).drop("activity_id").collect()
+        self.df_glucose_streams = self._load_glucose_data(lf_summary).drop("activity_id").collect()
+        return _typed(self.df_glucose_streams)
 
     FUELING_WINDOW_MINUTES = 45
     PRE_INTAKE_WINDOW_MINUTES = 15
 
     @check_types
     def get_fueling_glucose_windows(self) -> DataFrame[FuelingGlucoseWindowSchema]:
-        df_summary = self.get_summary()
+        if self.df_fueling_glucose_windows is not None:
+            return _typed(self.df_fueling_glucose_windows)
+
+        df_summary = cast(pl.DataFrame, self.get_summary())
+        questionnaires = self._get_questionnaire_cache()
+        cgm_by_activity = self._get_cgm_by_activity()
         window_rows: list[dict[str, int | float | None]] = []
 
         for row in df_summary.iter_rows(named=True):
@@ -194,24 +241,16 @@ class DataProcessor:
             start_date_local: datetime = row["start_date_local"]
             end_date_local: datetime = row["end_date_local"]
 
-            questionnaire_path = self.data_paths.questionnaire / f"{activity_id}.json"
-            if not questionnaire_path.exists():
+            questionnaire = questionnaires.get(activity_id)
+            if questionnaire is None:
                 continue
 
-            questionnaire = self.get_questionnaire(activity_id)
             if not questionnaire.fueling_during_run:
                 continue
 
-            df_cgm = (
-                pl.scan_delta(str(self.data_paths.carelink))
-                .filter((pl.col("type") == "CGM") & (pl.col("activity_id") == activity_id))
-                .select(["datetime", "value"])
-                .with_columns(pl.col("value").replace(0.0, None))
-                .sort("datetime")
-                .collect()
-            )
+            df_cgm = cgm_by_activity.get(activity_id)
 
-            if df_cgm.is_empty():
+            if df_cgm is None or df_cgm.is_empty():
                 continue
 
             fueling_list = questionnaire.fueling_during_run
@@ -245,7 +284,7 @@ class DataProcessor:
                     )
 
         if not window_rows:
-            return pl.DataFrame(
+            self.df_fueling_glucose_windows = pl.DataFrame(
                 schema={
                     "activity_id": pl.Int64,
                     "fueling_index": pl.Int64,
@@ -253,13 +292,19 @@ class DataProcessor:
                     "value": pl.Float64,
                 }
             )
+            return _typed(self.df_fueling_glucose_windows)
 
-        return pl.DataFrame(window_rows)
+        self.df_fueling_glucose_windows = pl.DataFrame(window_rows)
+        return _typed(self.df_fueling_glucose_windows)
 
     @check_types
     def get_fueling_impact(self) -> DataFrame[FuelingImpactSchema]:
-        df_summary = self.get_summary()
-        df_windows = self.get_fueling_glucose_windows()
+        if self.df_fueling_impact is not None:
+            return _typed(self.df_fueling_impact)
+
+        df_summary = cast(pl.DataFrame, self.get_summary())
+        df_windows = cast(pl.DataFrame, self.get_fueling_glucose_windows())
+        questionnaires = self._get_questionnaire_cache()
         impact_rows: list[dict[str, object]] = []
 
         for row in df_summary.iter_rows(named=True):
@@ -267,11 +312,10 @@ class DataProcessor:
             start_date_local: datetime = row["start_date_local"]
             name_date: str = row["name_date"]
 
-            questionnaire_path = self.data_paths.questionnaire / f"{activity_id}.json"
-            if not questionnaire_path.exists():
+            questionnaire = questionnaires.get(activity_id)
+            if questionnaire is None:
                 continue
 
-            questionnaire = self.get_questionnaire(activity_id)
             if not questionnaire.fueling_during_run:
                 continue
 
@@ -301,10 +345,10 @@ class DataProcessor:
                     continue
 
                 df_valid = df_event.drop_nulls("value")
-                peak_sg = df_valid["value"].max()
-                peak_increase = peak_sg - baseline_sg  # type: ignore[operator]
-                peak_row = df_valid.filter(pl.col("value") == peak_sg).head(1)
-                time_to_peak_min = peak_row["minutes_relative"].item()
+                peak_sg = float(df_valid.sort("value", descending=True)["value"].head(1).item())
+                peak_increase = peak_sg - baseline_sg
+                peak_row = df_valid.filter(pl.col("value") == peak_sg).sort("minutes_relative").head(1)
+                time_to_peak_min = cast(float, peak_row["minutes_relative"].item())
 
                 impact_rows.append(
                     {
@@ -320,7 +364,7 @@ class DataProcessor:
                 )
 
         if not impact_rows:
-            return pl.DataFrame(
+            self.df_fueling_impact = pl.DataFrame(
                 schema={
                     "activity_id": pl.Int64,
                     "fueling_index": pl.Int64,
@@ -332,8 +376,9 @@ class DataProcessor:
                     "name_date": pl.Utf8,
                 }
             )
+            return _typed(self.df_fueling_impact)
 
-        return pl.DataFrame(impact_rows).cast(
+        self.df_fueling_impact = pl.DataFrame(impact_rows).cast(
             {
                 "baseline_sg": pl.Float64,
                 "peak_sg": pl.Float64,
@@ -341,10 +386,16 @@ class DataProcessor:
                 "time_to_peak_min": pl.Float64,
             }
         )
+        return _typed(self.df_fueling_impact)
 
     @check_types
     def get_basal_adjustment_tir(self) -> DataFrame[BasalAdjustmentTirSchema]:
-        df_summary = self.get_summary()
+        if self.df_basal_adjustment_tir is not None:
+            return _typed(self.df_basal_adjustment_tir)
+
+        df_summary = cast(pl.DataFrame, self.get_summary())
+        questionnaires = self._get_questionnaire_cache()
+        cgm_by_activity = self._get_cgm_by_activity()
         tir_rows: list[dict[str, object]] = []
 
         for row in df_summary.iter_rows(named=True):
@@ -353,26 +404,19 @@ class DataProcessor:
             end_date_local: datetime = row["end_date_local"]
             name_date: str = row["name_date"]
 
-            questionnaire_path = self.data_paths.questionnaire / f"{activity_id}.json"
-            if not questionnaire_path.exists():
+            questionnaire = questionnaires.get(activity_id)
+            if questionnaire is None:
                 continue
 
-            questionnaire = self.get_questionnaire(activity_id)
             if not questionnaire.basal_adjustments:
                 continue
 
-            df_cgm = (
-                pl.scan_delta(str(self.data_paths.carelink))
-                .filter((pl.col("type") == "CGM") & (pl.col("activity_id") == activity_id))
-                .select(["datetime", "value"])
-                .with_columns(pl.col("value").replace(0.0, None))
-                .sort("datetime")
-                .collect()
-                .drop_nulls("value")
-            )
+            df_cgm = cgm_by_activity.get(activity_id)
 
-            if df_cgm.is_empty():
+            if df_cgm is None or df_cgm.is_empty():
                 continue
+
+            df_cgm = df_cgm.drop_nulls("value")
 
             adjustment_list = questionnaire.basal_adjustments
             for adjustment_index, adj in enumerate(adjustment_list):
@@ -422,7 +466,7 @@ class DataProcessor:
                 )
 
         if not tir_rows:
-            return pl.DataFrame(
+            self.df_basal_adjustment_tir = pl.DataFrame(
                 schema={
                     "activity_id": pl.Int64,
                     "adjustment_index": pl.Int64,
@@ -435,18 +479,24 @@ class DataProcessor:
                     "name_date": pl.Utf8,
                 }
             )
+            return _typed(self.df_basal_adjustment_tir)
 
-        return pl.DataFrame(tir_rows)
+        self.df_basal_adjustment_tir = pl.DataFrame(tir_rows).cast(
+            {
+                "basal_rate_percentage": pl.Float64,
+                "tir_pct": pl.Float64,
+                "covered_minutes": pl.Float64,
+            }
+        )
+        return _typed(self.df_basal_adjustment_tir)
 
     def _get_baseline_glucose(self, *, activity_id: int, fueling_datetime: datetime) -> float | None:
-        df_cgm = (
-            pl.scan_delta(str(self.data_paths.carelink))
-            .filter((pl.col("type") == "CGM") & (pl.col("activity_id") == activity_id))
-            .select(["datetime", "value"])
-            .with_columns(pl.col("value").replace(0.0, None))
-            .collect()
-            .drop_nulls("value")
-        )
+        df_cgm = self._get_cgm_by_activity().get(activity_id)
+
+        if df_cgm is None or df_cgm.is_empty():
+            return None
+
+        df_cgm = df_cgm.drop_nulls("value")
 
         if df_cgm.is_empty():
             return None
@@ -455,76 +505,85 @@ class DataProcessor:
             (pl.col("datetime") - fueling_datetime).dt.total_seconds().abs().alias("time_diff")
         )
         nearest = df_cgm.sort("time_diff").head(1)
-        return nearest["value"].item()  # type: ignore[return-value]
+        return float(nearest["value"].item())
 
     def _load_summary_data(self) -> LazyFrame[StravaSummarySchema]:
-        return pl.scan_delta(str(self.data_paths.strava_summary)).with_columns(
-            pl.format(
-                "{}:{}",
-                (pl.col("elapsed_time") // 3600),  # Hours
-                ((pl.col("elapsed_time") % 3600) // 60).cast(pl.Utf8).str.zfill(2),  # Minutes with zero-padding
-            ).alias("human_readable_time"),
-            pl.format(
-                "{}:{}",
-                (pl.col("average_pace").floor().cast(int)),  # Minutes
-                (((pl.col("average_pace") % 1) * 60).round(0).cast(int))
-                .cast(pl.Utf8)
-                .str.zfill(2),  # Seconds with zero-padding
-            ).alias("human_readable_pace"),
-            pl.format(
-                "{}",
-                (pl.col("distance") / 1000).round(1),  # Convert meters to kilometers
-            ).alias("distance_in_km"),
-            (pl.col("start_date_local") + pl.duration(seconds=pl.col("elapsed_time"))).alias("end_date_local"),
-            pl.format(
-                "{} on {}",
-                pl.col("name"),  # and only the date
-                pl.col("start_date_local").dt.date(),
-            ).alias("name_date"),
-            pl.col("start_date_local").dt.strftime("%Y-%m-%d").alias("date"),
-            pl.when(pl.col("name").str.contains(RunType.get_keyword(RunType.EASY)))
-            .then(pl.lit(RunType.EASY))
-            .when(pl.col("name").str.contains(RunType.get_keyword(RunType.INTERVAL)))
-            .then(pl.lit(RunType.INTERVAL))
-            .when(pl.col("name").str.contains(RunType.get_keyword(RunType.TEMPO)))
-            .then(pl.lit(RunType.TEMPO))
-            .when(pl.col("name").str.contains(RunType.get_keyword(RunType.LONG)))
-            .then(pl.lit(RunType.LONG))
-            .when(pl.col("name").str.contains(RunType.get_race_pattern()))
-            .then(pl.lit(RunType.RACE))
-            .otherwise(pl.lit(RunType.OTHER))
-            .alias("run_type"),
+        return cast(
+            LazyFrame[StravaSummarySchema],
+            pl.scan_delta(str(self.data_paths.strava_summary)).with_columns(
+                pl.format(
+                    "{}:{}",
+                    (pl.col("elapsed_time") // 3600),  # Hours
+                    ((pl.col("elapsed_time") % 3600) // 60).cast(pl.Utf8).str.zfill(2),  # Minutes with zero-padding
+                ).alias("human_readable_time"),
+                pl.format(
+                    "{}:{}",
+                    (pl.col("average_pace").floor().cast(int)),  # Minutes
+                    (((pl.col("average_pace") % 1) * 60).round(0).cast(int))
+                    .cast(pl.Utf8)
+                    .str.zfill(2),  # Seconds with zero-padding
+                ).alias("human_readable_pace"),
+                pl.format(
+                    "{}",
+                    (pl.col("distance") / 1000).round(1),  # Convert meters to kilometers
+                ).alias("distance_in_km"),
+                (pl.col("start_date_local") + pl.duration(seconds=pl.col("elapsed_time"))).alias("end_date_local"),
+                pl.format(
+                    "{} on {}",
+                    pl.col("name"),  # and only the date
+                    pl.col("start_date_local").dt.date(),
+                ).alias("name_date"),
+                pl.col("start_date_local").dt.strftime("%Y-%m-%d").alias("date"),
+                pl.when(pl.col("name").str.contains(EASY_KEYWORD))
+                .then(pl.lit(RunType.EASY))
+                .when(pl.col("name").str.contains(INTERVAL_KEYWORD))
+                .then(pl.lit(RunType.INTERVAL))
+                .when(pl.col("name").str.contains(TEMPO_KEYWORD))
+                .then(pl.lit(RunType.TEMPO))
+                .when(pl.col("name").str.contains(LONG_KEYWORD))
+                .then(pl.lit(RunType.LONG))
+                .when(pl.col("name").str.contains(RunType.get_race_pattern()))
+                .then(pl.lit(RunType.RACE))
+                .otherwise(pl.lit(RunType.OTHER))
+                .alias("run_type"),
+            ),
         )
 
     def _aggregate_glucose(self, lf_right: LazyFrame[StravaSummarySchema]) -> LazyFrame[AggregatedGlucoseSchema]:
-        return (
-            self._load_glucose_data(lf_right)
-            .group_by("activity_id")
-            .agg(
-                [
-                    pl.col("value").first().alias("in_going_sg"),
-                    pl.col("value").last().alias("out_going_sg"),
-                    pl.col("value").mean().alias("avg_sg"),
-                ]
-            )
+        return cast(
+            LazyFrame[AggregatedGlucoseSchema],
+            (
+                self._load_glucose_data(lf_right)
+                .group_by("activity_id")
+                .agg(
+                    [
+                        pl.col("value").first().alias("in_going_sg"),
+                        pl.col("value").last().alias("out_going_sg"),
+                        pl.col("value").mean().alias("avg_sg"),
+                    ]
+                )
+            ),
         )
 
     def _load_glucose_data(self, lf_right: LazyFrame[StravaSummarySchema]) -> LazyFrame[BaseGlucoseStreamSchema]:
-        return (
-            pl.scan_delta(str(self.data_paths.carelink))
-            .filter(pl.col("type") == "CGM")
-            .select(["value", "activity_id", "datetime"])
-            .join(
-                lf_right.select("activity_id", "start_date_local", "end_date_local", "run_type"),
-                on="activity_id",
-                how="inner",
-            )
-            .filter(
-                (pl.col("datetime") >= pl.col("start_date_local") - pl.duration(minutes=5))
-                & (pl.col("datetime") <= pl.col("end_date_local") + pl.duration(minutes=5))
-            )
-            .with_columns(pl.col("value").replace(0.0, None))
-            .drop(["start_date_local", "end_date_local"])
+        return cast(
+            LazyFrame[BaseGlucoseStreamSchema],
+            (
+                pl.scan_delta(str(self.data_paths.carelink))
+                .filter(pl.col("type") == "CGM")
+                .select(["value", "activity_id", "datetime"])
+                .join(
+                    lf_right.select("activity_id", "start_date_local", "end_date_local", "run_type"),
+                    on="activity_id",
+                    how="inner",
+                )
+                .filter(
+                    (pl.col("datetime") >= pl.col("start_date_local") - pl.duration(minutes=5))
+                    & (pl.col("datetime") <= pl.col("end_date_local") + pl.duration(minutes=5))
+                )
+                .with_columns(pl.col("value").replace(0.0, None))
+                .drop(["start_date_local", "end_date_local"])
+            ),
         )
 
     def _aggregate_insulin_on_board(
@@ -542,33 +601,76 @@ class DataProcessor:
             .clip(lower_bound=0.0)
             .alias("insulin_on_board_in_going")
         )
-        return (
-            self._load_pre_run_insulin_data(lf_right)
-            .with_columns(expression)
-            .group_by("activity_id")
-            .agg(pl.sum("insulin_on_board_in_going"))
+        return cast(
+            LazyFrame[AggregateInsulinOnBoard],
+            (
+                self._load_pre_run_insulin_data(lf_right)
+                .with_columns(expression)
+                .group_by("activity_id")
+                .agg(pl.sum("insulin_on_board_in_going"))
+            ),
         )
 
     def _load_pre_run_insulin_data(self, lf_right: LazyFrame[StravaSummarySchema]) -> LazyFrame[PreRunInsulinSchema]:
-        return (
-            pl.scan_delta(str(self.data_paths.carelink))
-            .filter(pl.col("type").is_in(["AUTO_BASAL_DELIVERY", "INSULIN"]))
-            .select(["value", "activity_id", "datetime"])
-            .join(
-                lf_right.select("activity_id", "start_date_local", "end_date_local"),
-                on="activity_id",
-                how="inner",
-            )
-            .filter(
-                (pl.col("datetime") >= pl.col("start_date_local") - pl.duration(minutes=PRE_RUN_INSULIN_MINUTES))
-                & (pl.col("datetime") <= pl.col("start_date_local") + pl.duration(minutes=5))
-            )
-            .drop("end_date_local")
+        return cast(
+            LazyFrame[PreRunInsulinSchema],
+            (
+                pl.scan_delta(str(self.data_paths.carelink))
+                .filter(pl.col("type").is_in(["AUTO_BASAL_DELIVERY", "INSULIN"]))
+                .select(["value", "activity_id", "datetime"])
+                .join(
+                    lf_right.select("activity_id", "start_date_local", "end_date_local"),
+                    on="activity_id",
+                    how="inner",
+                )
+                .filter(
+                    (pl.col("datetime") >= pl.col("start_date_local") - pl.duration(minutes=PRE_RUN_INSULIN_MINUTES))
+                    & (pl.col("datetime") <= pl.col("start_date_local") + pl.duration(minutes=5))
+                )
+                .drop("end_date_local")
+            ),
         )
 
+    def _get_cgm_data(self) -> pl.DataFrame:
+        if self.df_cgm is None:
+            self.df_cgm = (
+                pl.scan_delta(str(self.data_paths.carelink))
+                .filter(pl.col("type") == "CGM")
+                .select(["activity_id", "datetime", "value"])
+                .with_columns(pl.col("value").replace(0.0, None))
+                .sort(["activity_id", "datetime"])
+                .collect()
+            )
+        return self.df_cgm
+
+    def _get_cgm_by_activity(self) -> dict[int, pl.DataFrame]:
+        if self._cgm_by_activity is None:
+            self._cgm_by_activity = {}
+            for group in self._get_cgm_data().partition_by("activity_id", maintain_order=True):
+                activity_id = int(group["activity_id"].item(0))
+                self._cgm_by_activity[activity_id] = group.select(["datetime", "value"])
+        return self._cgm_by_activity
+
+    def _get_questionnaire_cache(self) -> dict[int, QuestionnaireModel]:
+        if self._questionnaire_cache is None:
+            self.data_paths.questionnaire.mkdir(parents=True, exist_ok=True)
+            self._questionnaire_cache = {}
+            for questionnaire_path in self.data_paths.questionnaire.glob("*.json"):
+                if not questionnaire_path.stem.isdigit():
+                    continue
+
+                with open(questionnaire_path) as f:
+                    data = json.load(f)
+
+                self._questionnaire_cache[int(questionnaire_path.stem)] = QuestionnaireModel.model_validate(data)
+
+        return self._questionnaire_cache
+
     def _join_data(self, *, lf_left: LazyFrame[T], lf_right: LazyFrame[U]) -> LazyFrame[V]:
-        return lf_left.join(
-            lf_right,
-            on="activity_id",
-            how="left",
+        return _typed(
+            lf_left.join(
+                lf_right,
+                on="activity_id",
+                how="left",
+            )
         )

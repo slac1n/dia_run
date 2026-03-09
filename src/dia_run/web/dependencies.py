@@ -11,6 +11,7 @@ from dia_run.data_models.paths import DataPaths
 from dia_run.data_processing.data_processing import DataProcessor
 from dia_run.s3_sync import S3DataSync
 from dia_run.settings import settings
+from dia_run.web.services.overview_page import OverviewPageService, get_overview_page_service
 
 MOCK_DATA_ROOT = Path("mock-data")
 
@@ -24,6 +25,10 @@ def get_data_paths() -> DataPaths:
 
 def get_data_processor(*, data_paths: Annotated[DataPaths, Depends(get_data_paths)]) -> DataProcessor:
     return DataProcessor(data_paths=data_paths)
+
+
+def get_overview_service(*, data_paths: Annotated[DataPaths, Depends(get_data_paths)]) -> OverviewPageService:
+    return get_overview_page_service(data_paths=data_paths)
 
 
 def get_data_fetcher_service(*, data_paths: Annotated[DataPaths, Depends(get_data_paths)]) -> DataFetcherService:
