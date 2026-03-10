@@ -44,6 +44,8 @@ class CareLinkGlucoseReading(BaseModel):
     @field_validator("sg")
     @classmethod
     def validate_glucose(cls, v: float | None) -> float | None:
+        if v == 0:
+            return None
         if v is not None and v < 20:
             raise ValueError(f"Glucose value {v} seems invalid (too low)")
         if v is not None and v > 600:

@@ -179,14 +179,14 @@ class LiveDataFetcher:
             raise ValueError("Failed to get CareLink data")
 
         try:
-            CareLinkResponse(**carelink_data)
+            validated_carelink_data = CareLinkResponse(**carelink_data)
         except Exception as e:
             raise ValueError(f"CareLink API response validation failed: {e}") from e
 
         if self.latest_activity_id is None:
             raise ValueError("Failed to get latest activity ID. You need to get Strava data first.")
 
-        df = pl.DataFrame(carelink_data["patientData"]["sgs"])
+        df = pl.DataFrame([reading.model_dump() for reading in validated_carelink_data.patientData.sgs])
 
         df = (
             df.with_columns(pl.lit("CGM").alias("type"), pl.col("sg").cast(pl.Float64))
@@ -200,17 +200,18 @@ class LiveDataFetcher:
             )
         )
         marker_extraction = []
-        for marker in carelink_data["patientData"]["markers"]:
-            if marker["type"] == "AUTO_BASAL_DELIVERY":
-                value = float(marker["data"]["dataValues"]["bolusAmount"])
-            elif marker["type"] == "INSULIN":
-                value = float(marker["data"]["dataValues"]["deliveredFastAmount"])
+        for marker in validated_carelink_data.patientData.markers:
+            marker_data = marker.model_dump()
+            if marker_data["type"] == "AUTO_BASAL_DELIVERY":
+                value = float(marker_data["data"]["dataValues"]["bolusAmount"])
+            elif marker_data["type"] == "INSULIN":
+                value = float(marker_data["data"]["dataValues"]["deliveredFastAmount"])
             else:
                 value = None
             marker_extraction.append(
                 {
-                    "timestamp": marker["timestamp"],
-                    "type": marker["type"],
+                    "timestamp": marker_data["timestamp"],
+                    "type": marker_data["type"],
                     "value": value,
                 }
             )
