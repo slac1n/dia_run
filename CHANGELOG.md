@@ -1,3 +1,10 @@
+## v0.22.1 (2026-03-10)
+
+### Fix
+
+- allow missing CareLink SG readings
+- **TG-37**: address code review issues for overview page caching (#45)
+
 ## v0.22.0 (2026-03-07)
 
 ### Feat
