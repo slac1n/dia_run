@@ -1,5 +1,43 @@
 # Development Guide
 
+## Branching Workflow
+
+- Cut all feature branches from `develop`.
+- Open feature PRs into `develop`; the `Tests` workflow runs there.
+- Treat `main` as the production branch.
+- When you are ready to ship, cut a `release/*` branch from `develop` and prepare the version and changelog there.
+- Promote releases with a `release/*` -> `main` PR; that merge creates the final `v*` tag on `main`.
+- Hotfixes branch from `main` as `hotfix/*`, open PRs back into `main`, and should be back-merged into `develop` after release.
+- PRs into `main` must come from `release/*` or `hotfix/*`, include a version bump, update `uv.lock`, and update `CHANGELOG.md`.
+- Do not push directly to `develop` or `main`.
+
+### Release Prep
+
+When `develop` is ready to ship, create a release branch and prepare the release metadata there:
+
+```bash
+git checkout develop
+git pull origin develop
+git checkout -b release/<planned-version>
+uvx --from commitizen cz bump --yes --changelog --version-files-only
+git add pyproject.toml uv.lock CHANGELOG.md
+git commit -m "chore: prepare release"
+```
+
+Open a PR from `release/*` into `main`, merge it once tests are green, and then merge the same `release/*` branch back into `develop`.
+
+### Hotfix Prep
+
+For a `hotfix/*` branch, prepare the release metadata before opening the PR into `main`:
+
+```bash
+uvx --from commitizen cz bump --yes --changelog --version-files-only
+git add pyproject.toml uv.lock CHANGELOG.md
+git commit -m "chore: prepare hotfix release"
+```
+
+This keeps `main` clean while still ensuring every hotfix promotion lands with a releasable version and changelog.
+
 ## Mock Data Mode
 
 Mock data mode lets you run the full application locally without real Strava or CareLink API credentials. No real API calls are made and the `./data` folder is completely untouched.
