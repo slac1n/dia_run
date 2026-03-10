@@ -1,3 +1,9 @@
+## v0.22.1 (2026-03-10)
+
+### Fix
+
+- allow missing CareLink SG readings
+
 ## v0.22.0 (2026-03-07)
 
 ### Feat
