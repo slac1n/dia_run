@@ -1,37 +1,52 @@
 import plotly.graph_objects as go
 import polars as pl
 
-from dia_run.dashboard.charts.theme import MAIN_COLOR, TARGET_RANGE_FILL, get_color_for_index, get_default_layout
+from dia_run.dashboard.charts.theme import (
+    MAIN_COLOR,
+    TARGET_RANGE_FILL,
+    get_bottom_legend,
+    get_color_for_index,
+    get_default_layout,
+)
 from dia_run.data_models.constants import TARGET_GLUCOSE_LOWER, TARGET_GLUCOSE_UPPER
 from dia_run.data_models.run_types import RunType
 from dia_run.data_processing.data_processing import DataProcessor
 
 
-def _build_run_type_color_map(*, run_type_order: list[RunType]) -> dict[RunType, str]:
-    return {run_type: get_color_for_index(idx) for idx, run_type in enumerate(run_type_order)}
+def _build_run_type_color_map(*, run_type_order: list[RunType]) -> dict[str, str]:
+    return {str(run_type): get_color_for_index(idx) for idx, run_type in enumerate(run_type_order)}
 
 
 def create_run_type_pie_chart(*, data_processor: DataProcessor, run_type_order: list[RunType]) -> go.Figure:
     df_summary = data_processor.get_summary()
 
-    run_type_value_counts = df_summary["run_type"].value_counts()
-    labels = run_type_value_counts["run_type"].to_list()
+    run_type_value_counts = {
+        str(row["run_type"]): int(row["count"]) for row in df_summary["run_type"].value_counts().iter_rows(named=True)
+    }
+    ordered_run_types = [str(run_type) for run_type in run_type_order if str(run_type) in run_type_value_counts]
+    remaining_run_types = sorted(label for label in run_type_value_counts if label not in set(ordered_run_types))
+    labels = [*ordered_run_types, *remaining_run_types]
+    values = [run_type_value_counts[label] for label in labels]
     color_map = _build_run_type_color_map(run_type_order=run_type_order)
     fig = go.Figure(
         data=[
             go.Pie(
                 labels=labels,
-                values=run_type_value_counts["count"].to_list(),
+                values=values,
+                sort=False,
+                rotation=0,
+                direction="clockwise",
+                textinfo="percent",
+                textposition="inside",
+                insidetextorientation="radial",
                 marker={"colors": [color_map.get(label, get_color_for_index(idx)) for idx, label in enumerate(labels)]},
             )
         ]
     )
-    fig.update_layout(
-        **get_default_layout(
-            title="Run Type Distribution",
-            showlegend=True,
-        )
-    )
+    layout = get_default_layout(title="Run Type Distribution", height=380, showlegend=True)
+    layout["legend"] = get_bottom_legend(y=-0.12) | {"x": 0.5, "xanchor": "center"}
+    layout["margin"] = {"l": 20, "r": 20, "t": 28, "b": 100}
+    fig.update_layout(**layout)
     return fig
 
 

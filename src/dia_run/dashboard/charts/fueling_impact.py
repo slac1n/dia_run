@@ -14,6 +14,23 @@ from dia_run.dashboard.charts.theme import (
 from dia_run.data_processing.data_processing import DataProcessor
 
 
+def _add_event_annotation(*, fig: go.Figure, x_value: int, text: str, color: str) -> None:
+    fig.add_annotation(
+        x=x_value,
+        y=1.05,
+        xref="x",
+        yref="paper",
+        text=text,
+        showarrow=False,
+        bgcolor="rgba(255, 255, 255, 0.92)",
+        bordercolor="rgba(47, 62, 70, 0.14)",
+        borderwidth=1,
+        font={"color": color, "size": 10},
+        xanchor="center",
+        yanchor="bottom",
+    )
+
+
 def _interpolate_to_minute_bins(df: pl.DataFrame, *, minute_bins: list[int]) -> pl.DataFrame:
     interpolated_rows = []
     for (activity_id, fueling_index), group in df.group_by(["activity_id", "fueling_index"]):
@@ -73,8 +90,9 @@ def create_fueling_glucose_response_chart(*, data_processor: DataProcessor) -> g
 
     fig = go.Figure()
 
-    min_minute = int(df_windows["minutes_relative"].min())
-    max_minute = int(df_windows["minutes_relative"].max())
+    minute_values = df_windows["minutes_relative"].to_numpy().astype(int)
+    min_minute = int(minute_values.min())
+    max_minute = int(minute_values.max())
     minute_bins = list(range(min_minute, max_minute + 1))
 
     df_interpolated = _interpolate_to_minute_bins(df_windows, minute_bins=minute_bins)
@@ -107,7 +125,7 @@ def create_fueling_glucose_response_chart(*, data_processor: DataProcessor) -> g
                 y=values,
                 mode="lines",
                 showlegend=False,
-                line=dict(width=1, dash="dash", color="rgba(47, 62, 70, 0.35)"),
+                line=dict(width=1, dash="dash", color="rgba(47, 62, 70, 0.16)"),
                 hovertemplate="Min: %{x:.0f}<br>Change: %{y:+.0f} mg/dL<extra></extra>",
             )
         )
@@ -116,6 +134,8 @@ def create_fueling_glucose_response_chart(*, data_processor: DataProcessor) -> g
         df_normalized.group_by("minutes_relative")
         .agg(
             pl.col("value_change").mean().alias("mean_value"),
+            pl.col("value_change").quantile(0.25).alias("q1_value"),
+            pl.col("value_change").quantile(0.75).alias("q3_value"),
             pl.struct(["activity_id", "fueling_index"]).n_unique().alias("n_contributing"),
         )
         .filter(pl.col("n_contributing") >= 3)
@@ -126,11 +146,33 @@ def create_fueling_glucose_response_chart(*, data_processor: DataProcessor) -> g
         fig.add_trace(
             go.Scatter(
                 x=df_mean["minutes_relative"],
+                y=df_mean["q3_value"],
+                mode="lines",
+                showlegend=False,
+                line=dict(width=0),
+                hoverinfo="skip",
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=df_mean["minutes_relative"],
+                y=df_mean["q1_value"],
+                mode="lines",
+                showlegend=False,
+                line=dict(width=0),
+                fill="tonexty",
+                fillcolor="rgba(82, 121, 111, 0.18)",
+                hovertemplate="IQR: %{y:+.0f} mg/dL<extra></extra>",
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=df_mean["minutes_relative"],
                 y=df_mean["mean_value"],
                 mode="lines",
                 name="Mean Response",
                 showlegend=False,
-                line=dict(color=NAVY, width=3),
+                line=dict(color=NAVY, width=3.5),
                 hovertemplate="Min: %{x:.0f}<br>Mean Change: %{y:+.0f} mg/dL<extra></extra>",
             )
         )
@@ -153,8 +195,9 @@ def create_fueling_glucose_response_chart(*, data_processor: DataProcessor) -> g
                     line_dash="dot",
                     line_color=TOMATO,
                     line_width=2,
-                    annotation_text=f"Lowest: +{lowest_point_minute} min",
-                    annotation_position="top right",
+                )
+                _add_event_annotation(
+                    fig=fig, x_value=lowest_point_minute, text=f"Low +{lowest_point_minute}", color=TOMATO
                 )
 
             after_lowest_mask = post_intake_minutes >= lowest_point_minute
@@ -170,20 +213,31 @@ def create_fueling_glucose_response_chart(*, data_processor: DataProcessor) -> g
                     line_dash="dot",
                     line_color=MAIN_COLOR_SHADE_500,
                     line_width=2,
-                    annotation_text=f"Baseline: +{return_to_baseline_minute} min",
-                    annotation_position="top right",
+                )
+                _add_event_annotation(
+                    fig=fig,
+                    x_value=return_to_baseline_minute,
+                    text=f"Base +{return_to_baseline_minute}",
+                    color=MAIN_COLOR_SHADE_500,
                 )
 
-    fig.add_vline(x=0, line_dash="dash", line_color=SANDY, line_width=2, annotation_text="Intake")
-
-    fig.update_layout(
-        **get_default_layout(
-            title="Glucose Response After Fueling",
-            xaxis_title="Minutes Relative to Fueling",
-            yaxis_title="Glucose Change [mg/dL]",
-            showlegend=False,
-        ),
+    fig.add_vline(
+        x=0,
+        line_dash="dash",
+        line_color=SANDY,
+        line_width=2,
     )
+    _add_event_annotation(fig=fig, x_value=0, text="Intake", color=SANDY)
+
+    layout = get_default_layout(
+        title="Glucose Response After Fueling",
+        xaxis_title="Minutes Relative to Fueling",
+        yaxis_title="Glucose Change [mg/dL]",
+        height=360,
+        showlegend=False,
+    )
+    layout["margin"] = {"l": 56, "r": 20, "t": 52, "b": 64}
+    fig.update_layout(**layout)
     fig.update_xaxes(
         range=[-DataProcessor.PRE_INTAKE_WINDOW_MINUTES, DataProcessor.FUELING_WINDOW_MINUTES],
         autorange=False,
@@ -211,7 +265,7 @@ def create_fueling_carbs_vs_peak_chart(*, data_processor: DataProcessor) -> go.F
     carbs = df_valid["carbohydrates_g"].to_numpy()
     peak_increase = df_valid["peak_increase"].to_numpy()
 
-    jitter = np.random.uniform(-1.0, 1.0, size=len(carbs))
+    jitter = np.random.default_rng(17).uniform(-1.0, 1.0, size=len(carbs))
     carbs_jittered = carbs + jitter
 
     fig = go.Figure()
@@ -224,7 +278,7 @@ def create_fueling_carbs_vs_peak_chart(*, data_processor: DataProcessor) -> go.F
             marker=dict(
                 size=12,
                 color=MAIN_COLOR_SHADE_500,
-                opacity=0.6,
+                opacity=0.72,
                 line=dict(width=1, color=NAVY),
             ),
             hovertemplate=(
@@ -246,12 +300,13 @@ def create_fueling_carbs_vs_peak_chart(*, data_processor: DataProcessor) -> go.F
         )
     )
 
-    fig.update_layout(
-        **get_default_layout(
-            title="Carbohydrate Intake vs. Peak Glucose Increase",
-            xaxis_title="Carbohydrates [g]",
-            yaxis_title="Peak Glucose Increase [mg/dL]",
-        )
+    layout = get_default_layout(
+        title="Carbohydrate Intake vs. Peak Glucose Increase",
+        xaxis_title="Carbohydrates [g]",
+        yaxis_title="Peak Glucose Increase [mg/dL]",
+        height=360,
     )
+    layout["margin"] = {"l": 56, "r": 20, "t": 28, "b": 64}
+    fig.update_layout(**layout)
 
     return fig

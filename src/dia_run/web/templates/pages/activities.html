@@ -28,15 +28,18 @@
         <tbody>
           {% for activity in activities %}
           <tr>
-            <td>
-              <a class="table-link" href="/activities/{{ activity.activity_id }}">{{ activity.name }}</a>
+            <td data-label="Activity">
+              <div class="table-primary">
+                <a class="table-link" href="/activities/{{ activity.activity_id }}">{{ activity.name }}</a>
+                <span class="table-secondary">{{ activity.date }}</span>
+              </div>
             </td>
-            <td>{{ activity.date }}</td>
-            <td>{{ activity.distance }}</td>
-            <td>{{ activity.time }}</td>
-            <td>{{ activity.pace }}</td>
-            <td>{{ activity.average_heartrate }}</td>
-            <td>{{ activity.run_type }}</td>
+            <td data-label="Date">{{ activity.date }}</td>
+            <td data-label="Distance">{{ activity.distance }}</td>
+            <td data-label="Time">{{ activity.time }}</td>
+            <td data-label="Pace">{{ activity.pace }}</td>
+            <td data-label="Avg HR">{{ activity.average_heartrate }}</td>
+            <td data-label="Run Type">{{ activity.run_type }}</td>
           </tr>
           {% endfor %}
         </tbody>
