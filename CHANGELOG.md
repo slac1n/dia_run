@@ -1,3 +1,13 @@
+## v0.23.0 (2026-03-11)
+
+### Feat
+
+- **TG-39**: optimize dashboard charts for mobile usability (#49)
+
+### Fix
+
+- **TG-37**: address code review issues for overview page caching (#45)
+
 ## v0.22.1 (2026-03-10)
 
 ### Fix
