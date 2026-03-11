@@ -67,23 +67,33 @@ def get_default_layout(
     """
     layout: dict[str, Any] = {
         "meta": {"card_title": title},
+        "autosize": True,
         "paper_bgcolor": CHART_PAPER_BG,
         "plot_bgcolor": CHART_BG,
-        "font": {"color": NAVY, "family": "Work Sans, sans-serif"},
+        "font": {"color": NAVY, "family": "Work Sans, sans-serif", "size": 12},
+        "hoverlabel": {"font": {"family": "Work Sans, sans-serif", "size": 12}},
         "xaxis": {
-            "title": {"text": xaxis_title, "font": {"color": NAVY}},
+            "title": {"text": xaxis_title, "font": {"color": NAVY, "size": 12}, "standoff": 10},
             "gridcolor": CHART_GRID,
             "linecolor": CHART_GRID,
-            "tickfont": {"color": COLOR_MUTED},
+            "automargin": True,
+            "tickfont": {"color": COLOR_MUTED, "size": 11},
         },
         "yaxis": {
-            "title": {"text": yaxis_title, "font": {"color": NAVY}},
+            "title": {"text": yaxis_title, "font": {"color": NAVY, "size": 12}, "standoff": 10},
             "gridcolor": CHART_GRID,
             "linecolor": CHART_GRID,
-            "tickfont": {"color": COLOR_MUTED},
+            "automargin": True,
+            "tickfont": {"color": COLOR_MUTED, "size": 11},
         },
         "showlegend": showlegend,
-        "margin": {"l": 60, "r": 30, "t": 30, "b": 60},
+        "legend": {
+            "bgcolor": "rgba(255, 255, 255, 0.88)",
+            "bordercolor": CHART_GRID,
+            "borderwidth": 1,
+            "font": {"color": NAVY, "size": 12},
+        },
+        "margin": {"l": 56, "r": 20, "t": 28, "b": 56},
     }
 
     if height is not None:
@@ -120,6 +130,36 @@ def get_empty_chart_layout(*, title: str, message: str = "No data available") ->
         ],
         "xaxis": {"visible": False},
         "yaxis": {"visible": False},
+    }
+
+
+def get_bottom_legend(*, y: float = -0.2) -> dict[str, Any]:
+    """Get a horizontal legend placed below the chart."""
+    return {
+        "orientation": "h",
+        "x": 0.0,
+        "xanchor": "left",
+        "y": y,
+        "yanchor": "top",
+        "bgcolor": "rgba(255, 255, 255, 0.88)",
+        "bordercolor": CHART_GRID,
+        "borderwidth": 1,
+        "font": {"color": NAVY, "size": 11},
+    }
+
+
+def get_horizontal_colorbar(*, title: str, y: float = -0.28) -> dict[str, Any]:
+    """Get a horizontal colorbar configuration placed below the plot."""
+    return {
+        "orientation": "h",
+        "len": 1.0,
+        "thickness": 12,
+        "x": 0.5,
+        "xanchor": "center",
+        "y": y,
+        "yanchor": "top",
+        "tickfont": {"color": COLOR_MUTED, "size": 10},
+        "title": {"text": title, "side": "top", "font": {"color": NAVY, "size": 11}},
     }
 
 

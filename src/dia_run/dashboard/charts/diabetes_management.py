@@ -5,7 +5,6 @@ import polars as pl
 
 from dia_run.dashboard.charts.theme import (
     ASH_GREY,
-    COLOR_MUTED,
     MAIN_COLOR,
     MAIN_COLOR_SHADE_300,
     MAIN_COLOR_SHADE_500,
@@ -13,12 +12,18 @@ from dia_run.dashboard.charts.theme import (
     TARGET_RANGE_FILL,
     get_default_layout,
     get_empty_chart_layout,
+    get_horizontal_colorbar,
 )
 from dia_run.data_models.constants import TARGET_GLUCOSE_LOWER, TARGET_GLUCOSE_UPPER
 from dia_run.data_processing.data_processing import DataProcessor
 
 
-def create_in_going_out_going_sensor_glucose_chart(*, data_processor: DataProcessor) -> px.scatter:
+def _get_jittered_values(*, values: np.ndarray, magnitude: float, seed: int) -> np.ndarray:
+    jitter = np.random.default_rng(seed).uniform(-magnitude, magnitude, size=values.shape)
+    return values + jitter
+
+
+def create_in_going_out_going_sensor_glucose_chart(*, data_processor: DataProcessor) -> go.Figure:
     df_summary = data_processor.get_summary()
     df_summary = df_summary.drop_nulls(subset=["in_going_sg", "out_going_sg"]).with_columns(
         pl.concat_list("insulin_on_board_in_going", "insulin_on_board_in_going", None).alias("line_x"),
@@ -54,13 +59,17 @@ def create_in_going_out_going_sensor_glucose_chart(*, data_processor: DataProces
             ),
         ]
     )
+    iob_values = df_summary["insulin_on_board_in_going"].to_numpy().astype(float)
+    x_min = float(iob_values.min()) - 0.1
+    x_max = float(iob_values.max()) + 0.1
+
     fig.add_shape(
         type="rect",
         xref="x",
         yref="y",
-        x0=df_summary["insulin_on_board_in_going"].min() - 0.1,
+        x0=x_min,
         y0=TARGET_GLUCOSE_LOWER,
-        x1=df_summary["insulin_on_board_in_going"].max() + 0.1,
+        x1=x_max,
         y1=TARGET_GLUCOSE_UPPER,
         fillcolor=TARGET_RANGE_FILL,
         opacity=0.3,
@@ -78,7 +87,7 @@ def create_in_going_out_going_sensor_glucose_chart(*, data_processor: DataProces
     return fig
 
 
-def create_insulin_on_board_and_normalized_glucose_change_chart(data_processor: DataProcessor) -> px.scatter:
+def create_insulin_on_board_and_normalized_glucose_change_chart(data_processor: DataProcessor) -> go.Figure:
     df_summary = data_processor.get_summary()
     df_summary = df_summary.with_columns(
         (
@@ -91,7 +100,7 @@ def create_insulin_on_board_and_normalized_glucose_change_chart(data_processor: 
         x="insulin_on_board_in_going",
         y="normalized_glucose_change",
         trendline="ols",
-        custom_data={"name_date"},
+        custom_data=["name_date"],
     )
     fig.update_traces(
         hovertemplate="<b>%{customdata[0]}</b><extra></extra>",
@@ -103,7 +112,7 @@ def create_insulin_on_board_and_normalized_glucose_change_chart(data_processor: 
         **get_default_layout(
             title="Insulin on Board at Start vs. Normalized Change in Sensor Glucose",
             xaxis_title="Insulin on Board at Start [U]",
-            yaxis_title="Normalized Sensor Glucose Change <br>During Activity [mg/dl/min]",
+            yaxis_title="Glucose Delta [mg/dL/min]",
         )
     )
     return fig
@@ -123,25 +132,31 @@ def create_pre_nutrition_impact_chart(data_processor: DataProcessor) -> go.Figur
         return fig
 
     minutes_before_start = df_nutrition["earliest_time_before_start_min"].abs().to_numpy()
+    carbs = df_nutrition["total_carbohydrates_g"].to_numpy().astype(float)
+    glucose = df_nutrition["in_going_sg"].to_numpy().astype(float)
+
+    carbs_jittered = _get_jittered_values(values=carbs, magnitude=2.0, seed=7)
+    glucose_jittered = _get_jittered_values(values=glucose, magnitude=2.0, seed=11)
 
     fig = go.Figure(
         data=[
             go.Scatter(
-                x=df_nutrition["total_carbohydrates_g"],
-                y=df_nutrition["in_going_sg"],
+                x=carbs_jittered,
+                y=glucose_jittered,
                 mode="markers",
                 marker=dict(
-                    size=10,
+                    size=11,
                     color=df_nutrition["avg_bolus_percentage"],
                     colorscale=[(0, MAIN_COLOR_SHADE_300), (0.5, MAIN_COLOR_SHADE_500), (1, MAIN_COLOR)],
-                    colorbar=dict(title="Bolus [%]", tickfont={"color": COLOR_MUTED}),
+                    colorbar=get_horizontal_colorbar(title="Bolus [%]", y=-0.24),
                     showscale=True,
                     line=dict(width=1, color=NAVY),
+                    opacity=0.82,
                 ),
                 hovertemplate=(
                     "<b>%{customdata[0]}</b><br>"
-                    "Carbs: %{x}g<br>"
-                    "In-Going SG: %{y:.0f} mg/dL<br>"
+                    "Carbs: %{customdata[3]:.0f}g<br>"
+                    "In-Going SG: %{customdata[4]:.0f} mg/dL<br>"
                     "Timing: %{customdata[1]} min before<br>"
                     "Bolus: %{customdata[2]:.0f}%"
                     "<extra></extra>"
@@ -151,14 +166,16 @@ def create_pre_nutrition_impact_chart(data_processor: DataProcessor) -> go.Figur
                         df_nutrition["name_date"].to_numpy(),
                         minutes_before_start,
                         df_nutrition["avg_bolus_percentage"].to_numpy(),
+                        carbs,
+                        glucose,
                     ]
                 ),
             )
         ]
     )
 
-    x_min = df_nutrition["total_carbohydrates_g"].min() - 5
-    x_max = df_nutrition["total_carbohydrates_g"].max() + 5
+    x_min = float(carbs.min()) - 5
+    x_max = float(carbs.max()) + 5
     fig.add_shape(
         type="rect",
         xref="x",
@@ -173,13 +190,14 @@ def create_pre_nutrition_impact_chart(data_processor: DataProcessor) -> go.Figur
         line_width=0,
     )
 
-    fig.update_layout(
-        **get_default_layout(
-            title="Pre-Run Nutrition Impact on In-Going Sensor Glucose",
-            xaxis_title="Total Pre-Run Carbohydrates [g]",
-            yaxis_title="In-Going Sensor Glucose [mg/dL]",
-        )
+    layout = get_default_layout(
+        title="Pre-Run Nutrition Impact on In-Going Sensor Glucose",
+        xaxis_title="Pre-Run Carbs [g]",
+        yaxis_title="Glucose [mg/dL]",
+        height=360,
     )
+    layout["margin"] = {"l": 56, "r": 20, "t": 28, "b": 110}
+    fig.update_layout(**layout)
 
     return fig
 
@@ -345,7 +363,7 @@ def create_pre_nutrition_heatmap(data_processor: DataProcessor) -> go.Figure:
         )
         return fig
 
-    carb_bin_size = 10
+    carb_bin_size = 20
     time_bin_size = 15
 
     df_binned = df_nutrition.with_columns(
@@ -383,8 +401,8 @@ def create_pre_nutrition_heatmap(data_processor: DataProcessor) -> go.Figure:
         z_values.append(z_row)
         hover_text.append(hover_row)
 
-    carb_labels = [f"{b}-{b + carb_bin_size}g" for b in carb_bins]
-    time_labels = [f"{b}-{b + time_bin_size} min" for b in time_bins]
+    carb_labels = [f"{b}-{b + carb_bin_size}" for b in carb_bins]
+    time_labels = [f"{b}-{b + time_bin_size}" for b in time_bins]
 
     flat_values = [v for row in z_values for v in row if v is not None]
     z_min = min(flat_values)
@@ -424,18 +442,19 @@ def create_pre_nutrition_heatmap(data_processor: DataProcessor) -> go.Figure:
             colorscale=colorscale,
             zmin=z_min,
             zmax=z_max,
-            colorbar=dict(title="Avg In-Going<br>SG [mg/dL]", tickfont={"color": COLOR_MUTED}),
+            colorbar=get_horizontal_colorbar(title="Avg glucose [mg/dL]", y=-0.26),
             hovertext=hover_text,
-            hovertemplate="Carbs: %{x}<br>Timing: %{y}<br>%{hovertext}<extra></extra>",
+            hovertemplate="Carbs: %{x} g<br>Timing: %{y} min<br>%{hovertext}<extra></extra>",
         )
     )
 
-    fig.update_layout(
-        **get_default_layout(
-            title="Pre-Run Nutrition Heatmap: Carbs x Timing -> Avg In-Going Sensor Glucose",
-            xaxis_title="Total Pre-Run Carbohydrates",
-            yaxis_title="Minutes Before Start",
-        )
+    layout = get_default_layout(
+        title="Pre-Run Nutrition Heatmap: Carbs x Timing -> Avg In-Going Sensor Glucose",
+        xaxis_title="Pre-Run Carbs [g]",
+        yaxis_title="Minutes Before Start",
+        height=420,
     )
-
+    layout["margin"] = {"l": 72, "r": 16, "t": 28, "b": 120}
+    fig.update_layout(**layout)
+    fig.update_xaxes(tickangle=0)
     return fig
