@@ -348,6 +348,16 @@ code {
   width: 100%;
 }
 
+.chart-card--calendar {
+  overflow-x: auto;
+  overflow-y: visible;
+  padding-bottom: 1rem;
+}
+
+.chart-card--calendar .chart-embed {
+  min-width: 1080px;
+}
+
 .table-card {
   padding: 1.5rem;
   border-radius: 22px;
@@ -390,6 +400,18 @@ code {
 .table-link {
   font-weight: 600;
   color: var(--color-primary);
+}
+
+.table-primary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.table-secondary {
+  display: none;
+  font-size: 0.82rem;
+  color: var(--text-muted);
 }
 
 .empty-card {
@@ -678,6 +700,100 @@ code {
 
   .info-grid {
     grid-template-columns: 1fr;
+  }
+
+  .section {
+    padding: 2rem 0 1.25rem;
+  }
+
+  .section-note {
+    max-width: none;
+    font-size: 0.92rem;
+  }
+
+  .chart-card,
+  .list-card,
+  .table-card,
+  .form-card {
+    padding: 1rem;
+    border-radius: 18px;
+  }
+
+  .chart-card h3 {
+    font-size: 1rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .chart-embed {
+    min-height: 250px;
+  }
+
+  .chart-card--calendar {
+    margin-inline: -0.2rem;
+    padding-inline: 0.8rem;
+  }
+
+  .chart-card--calendar .chart-embed {
+    min-width: 1080px;
+    min-height: 220px;
+  }
+
+  .detail-item {
+    font-size: 0.85rem;
+  }
+
+  .table-card {
+    padding: 1rem;
+  }
+
+  .table-scroll {
+    overflow-x: visible;
+  }
+
+  .data-table,
+  .data-table tbody,
+  .data-table tr,
+  .data-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .data-table {
+    min-width: 0;
+  }
+
+  .data-table thead {
+    display: none;
+  }
+
+  .data-table tr {
+    padding: 0.9rem 0;
+    border-bottom: 1px solid rgba(47, 62, 70, 0.1);
+  }
+
+  .data-table td {
+    padding: 0.2rem 0;
+    border-bottom: none;
+  }
+
+  .data-table td::before {
+    content: attr(data-label);
+    display: inline-block;
+    min-width: 5.6rem;
+    margin-right: 0.5rem;
+    color: var(--color-secondary);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .data-table td:first-child::before {
+    display: none;
+  }
+
+  .table-secondary {
+    display: block;
   }
 
   .form-row,

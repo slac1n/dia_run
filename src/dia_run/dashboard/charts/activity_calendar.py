@@ -87,6 +87,7 @@ def _append_current_week_to_calendar(*, calendar: Calendar, current_week: Calend
 def _create_heatmap_figure(calendar: Calendar) -> go.Figure:
     return go.Figure(
         data=go.Heatmap(
+            x=list(range(len(calendar.distance[0]))),
             z=calendar.distance[::-1],
             y=WEEKDAYS[::-1],
             colorscale=ACTIVITY_COLOR_SCALE,
@@ -94,8 +95,8 @@ def _create_heatmap_figure(calendar: Calendar) -> go.Figure:
             zmax=20,
             showscale=False,
             hoverongaps=False,
-            xgap=4,
-            ygap=4,
+            xgap=2,
+            ygap=2,
             customdata=calendar.dates[::-1],
             hovertemplate="%{z}km on %{customdata}<extra></extra>",
         )
@@ -120,12 +121,13 @@ def _update_figure_layout(*, fig: go.Figure, current_year: int, month_positions:
             color=COLOR_MUTED,
             size=12,
         ),
-        height=180,
-        margin=dict(l=50, r=10, t=20, b=20),
+        height=182,
+        margin=dict(l=44, r=28, t=18, b=28),
         xaxis=dict(
             showgrid=False,
             showline=False,
             zeroline=False,
+            tickfont=dict(size=10),
             tickmode="array",
             tickvals=list(month_positions.values()),
             ticktext=list(month_positions.keys()),
@@ -134,5 +136,6 @@ def _update_figure_layout(*, fig: go.Figure, current_year: int, month_positions:
             showgrid=False,
             showline=False,
             zeroline=False,
+            tickfont=dict(size=11),
         ),
     )

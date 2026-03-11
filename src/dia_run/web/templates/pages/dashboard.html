@@ -43,8 +43,8 @@
     <p class="section-note">Year-to-date running volume by day. <a class="inline-link" href="/activities">View activity list</a>.</p>
   </div>
   <div class="chart-grid">
-    <div class="chart-card chart-card--full">
-      <div class="chart-embed">{{ charts.activity_calendar }}</div>
+    <div class="chart-card chart-card--full chart-card--calendar">
+      <div class="chart-embed" data-plot-kind="activity_calendar">{{ charts.activity_calendar }}</div>
     </div>
   </div>
 </section>
@@ -60,19 +60,19 @@
   <div class="chart-grid">
     <div class="chart-card">
       <h3>Run type distribution</h3>
-      <div class="chart-embed">{{ charts.run_type_pie }}</div>
+      <div class="chart-embed" data-plot-kind="run_type_pie">{{ charts.run_type_pie }}</div>
     </div>
     <div class="chart-card">
       <h3>Total distance by run type</h3>
-      <div class="chart-embed">{{ charts.run_type_distance }}</div>
+      <div class="chart-embed" data-plot-kind="run_type_distance">{{ charts.run_type_distance }}</div>
     </div>
     <div class="chart-card">
       <h3>Heartrate by run type</h3>
-      <div class="chart-embed">{{ charts.run_type_heartrate }}</div>
+      <div class="chart-embed" data-plot-kind="run_type_heartrate">{{ charts.run_type_heartrate }}</div>
     </div>
     <div class="chart-card">
       <h3>Sensor glucose by run type</h3>
-      <div class="chart-embed">{{ charts.run_type_glucose }}</div>
+      <div class="chart-embed" data-plot-kind="run_type_glucose">{{ charts.run_type_glucose }}</div>
     </div>
   </div>
 </section>
@@ -88,27 +88,27 @@
   <div class="chart-grid">
     <div class="chart-card">
       <h3>Insulin on board vs start and end glucose</h3>
-      <div class="chart-embed">{{ charts.in_out_sg }}</div>
+      <div class="chart-embed" data-plot-kind="in_out_sg">{{ charts.in_out_sg }}</div>
     </div>
     <div class="chart-card">
       <h3>Insulin on board vs normalized change</h3>
-      <div class="chart-embed">{{ charts.iob_norm_change }}</div>
+      <div class="chart-embed" data-plot-kind="iob_norm_change">{{ charts.iob_norm_change }}</div>
     </div>
     <div class="chart-card">
       <h3>Pre-run carbs vs in-going glucose</h3>
-      <div class="chart-embed">{{ charts.pre_nutrition_impact }}</div>
+      <div class="chart-embed" data-plot-kind="pre_nutrition_impact">{{ charts.pre_nutrition_impact }}</div>
     </div>
     <div class="chart-card">
       <h3>Bolus percentage vs in-going glucose</h3>
-      <div class="chart-embed">{{ charts.pre_nutrition_bolus }}</div>
+      <div class="chart-embed" data-plot-kind="pre_nutrition_bolus">{{ charts.pre_nutrition_bolus }}</div>
     </div>
     <div class="chart-card">
       <h3>Timing vs in-going glucose</h3>
-      <div class="chart-embed">{{ charts.pre_nutrition_timing }}</div>
+      <div class="chart-embed" data-plot-kind="pre_nutrition_timing">{{ charts.pre_nutrition_timing }}</div>
     </div>
     <div class="chart-card">
       <h3>Carbs and timing heatmap</h3>
-      <div class="chart-embed">{{ charts.pre_nutrition_heatmap }}</div>
+      <div class="chart-embed" data-plot-kind="pre_nutrition_heatmap">{{ charts.pre_nutrition_heatmap }}</div>
     </div>
   </div>
 </section>
@@ -124,15 +124,15 @@
   <div class="chart-grid">
     <div class="chart-card">
       <h3>Glucose response after fueling</h3>
-      <div class="chart-embed">{{ charts.fueling_response }}</div>
+      <div class="chart-embed" data-plot-kind="fueling_response">{{ charts.fueling_response }}</div>
     </div>
     <div class="chart-card">
       <h3>Carbs vs peak increase</h3>
-      <div class="chart-embed">{{ charts.fueling_carbs_peak }}</div>
+      <div class="chart-embed" data-plot-kind="fueling_carbs_peak">{{ charts.fueling_carbs_peak }}</div>
     </div>
     <div class="chart-card chart-card--full">
       <h3>Time in range during basal adjustments</h3>
-      <div class="chart-embed">{{ charts.basal_adjustment_tir }}</div>
+      <div class="chart-embed" data-plot-kind="basal_adjustment_tir">{{ charts.basal_adjustment_tir }}</div>
     </div>
   </div>
 </section>

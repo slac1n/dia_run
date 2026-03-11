@@ -11,6 +11,7 @@ from dia_run.dashboard.charts.theme import (
     SANDY,
     TARGET_RANGE_FILL,
     TOMATO,
+    get_bottom_legend,
     get_default_layout,
 )
 from dia_run.data_models.constants import TARGET_GLUCOSE_LOWER, TARGET_GLUCOSE_UPPER
@@ -40,7 +41,7 @@ def create_single_activity_carelink_chart(*, data_processor: DataProcessor, acti
             y=sel_df_carelink_cgm["value"],
             name="Sensor Glucose",
             mode="lines",
-            line=dict(color=NAVY),
+            line=dict(color=NAVY, width=2.4),
         ),
         secondary_y=False,
     )
@@ -52,7 +53,7 @@ def create_single_activity_carelink_chart(*, data_processor: DataProcessor, acti
                 x=sel_df_carelink_basal["datetime"],
                 y=sel_df_carelink_basal["value"],
                 name="Basal Insulin",
-                marker=dict(color=GOLD),
+                marker=dict(color=GOLD, opacity=0.6),
             ),
             secondary_y=True,
         )
@@ -68,7 +69,7 @@ def create_single_activity_carelink_chart(*, data_processor: DataProcessor, acti
                 x=sel_df_carelink_bolus["datetime"],
                 y=sel_df_carelink_bolus["value"],
                 name="Bolus Insulin",
-                marker=dict(color=SANDY),
+                marker=dict(color=SANDY, opacity=0.72),
             ),
             secondary_y=True,
         )
@@ -81,6 +82,7 @@ def create_single_activity_carelink_chart(*, data_processor: DataProcessor, acti
         dash="solid",
         width=2.4,
     )
+    _add_event_band(fig=fig, start_time=start_datetime, color=COLOR_SUCCESS, width_minutes=2.0)
     _add_vertical_line(
         fig=fig,
         datetime_instance=end_datetime,
@@ -89,6 +91,7 @@ def create_single_activity_carelink_chart(*, data_processor: DataProcessor, acti
         dash="longdash",
         width=2.4,
     )
+    _add_event_band(fig=fig, start_time=end_datetime, color=TOMATO, width_minutes=2.0)
 
     fig.add_shape(
         type="rect",
@@ -116,6 +119,7 @@ def create_single_activity_carelink_chart(*, data_processor: DataProcessor, acti
                 width=2.0,
                 opacity=0.9,
             )
+            _add_event_band(fig=fig, start_time=prerun_time, color=SANDY, width_minutes=1.0)
 
     if questionnaire.fueling_during_run:
         for fuel_instance, fuel in enumerate(questionnaire.fueling_during_run):
@@ -130,17 +134,34 @@ def create_single_activity_carelink_chart(*, data_processor: DataProcessor, acti
                 width=1.8,
                 opacity=0.85,
             )
+            _add_event_band(fig=fig, start_time=fuel_time, color=NAVY, width_minutes=1.0)
 
+    layout = get_default_layout(
+        title="Single Activity CareLink Overview",
+        xaxis_title="",
+        yaxis_title="Sensor Glucose [mg/dl]",
+        height=420,
+        showlegend=True,
+    )
+    layout["margin"] = {"l": 56, "r": 24, "t": 28, "b": 152}
+    fig.update_layout(**layout, barmode="overlay", hovermode="x unified")
     fig.update_layout(
-        **get_default_layout(
-            title="Single Activity CareLink Overview",
-            xaxis_title="Time",
-            yaxis_title="Sensor Glucose [mg/dl]",
-            showlegend=True,
-        )
+        legend=get_bottom_legend(y=-0.28) | {"tracegroupgap": 8, "x": 0.5, "xanchor": "center"},
     )
 
     return fig
+
+
+def _add_event_band(*, fig: go.Figure, start_time: datetime, color: str, width_minutes: float) -> None:
+    half_width = timedelta(minutes=width_minutes / 2)
+    fig.add_vrect(
+        x0=start_time - half_width,
+        x1=start_time + half_width,
+        fillcolor=color,
+        opacity=0.12,
+        line_width=0,
+        layer="below",
+    )
 
 
 def _add_vertical_line(
