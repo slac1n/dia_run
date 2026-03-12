@@ -5,16 +5,16 @@ FetchStatus = Literal["none", "started", "success", "error"]
 
 class FetchState(TypedDict):
     status: FetchStatus
-    inserted_count: int
+    new_activity_found: bool
 
 
-_current_status: FetchState = {"status": "none", "inserted_count": 0}
+_current_status: FetchState = {"status": "none", "new_activity_found": False}
 
 
-def set_fetch_status(*, status: FetchStatus, inserted_count: int = 0) -> None:
+def set_fetch_status(*, status: FetchStatus, new_activity_found: bool = False) -> None:
     global _current_status  # noqa: PLW0603
-    _current_status = {"status": status, "inserted_count": inserted_count}
+    _current_status = {"status": status, "new_activity_found": new_activity_found}
 
 
 def get_fetch_status() -> FetchState:
-    return {"status": _current_status["status"], "inserted_count": _current_status["inserted_count"]}
+    return {"status": _current_status["status"], "new_activity_found": _current_status["new_activity_found"]}

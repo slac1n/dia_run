@@ -27,7 +27,7 @@ class LiveDataFetcher:
         self.latest_activity_id: int | None = None
         self.activity_id_list: list[int] = self._get_activity_ids()
 
-    def fetch_latest_data_and_save(self) -> int:
+    def fetch_latest_data_and_save(self) -> bool:
         logger.info("Fetching Strava data...")
         strava_summary_data, strava_stream_data = self._get_strava_data()
         logger.info("Fetching CareLink data...")
@@ -48,7 +48,7 @@ class LiveDataFetcher:
             logger.info("Saving strava stream data...")
             strava_stream_data.write_delta(self.STRAVA_STREAM_DIR, mode="append")
 
-        return 1 if strava_summary_data is not None else 0
+        return strava_summary_data is not None
 
     def _get_activity_ids(self) -> list[int]:
         if not self._is_delta_table():

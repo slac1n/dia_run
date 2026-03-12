@@ -320,7 +320,7 @@ classDiagram
 
     class DataFetcherService {
         <<Protocol>>
-        +fetch_latest_data_and_save() int
+        +fetch_latest_data_and_save() bool
     }
 
     class LiveDataFetcher {
@@ -328,7 +328,7 @@ classDiagram
         -Path STRAVA_STREAM_DIR
         -Path CARELINK_DIR
         -int | None latest_activity_id
-        +fetch_latest_data_and_save() int
+        +fetch_latest_data_and_save() bool
     }
 
     class MockDataFetcher {
@@ -336,7 +336,7 @@ classDiagram
         -Path STRAVA_STREAM_DIR
         -Path CARELINK_DIR
         -Path QUESTIONNAIRE_DIR
-        +fetch_latest_data_and_save() int
+        +fetch_latest_data_and_save() bool
     }
 
     class CareLinkClient {

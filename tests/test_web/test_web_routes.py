@@ -15,11 +15,11 @@ from dia_run.web.services.overview_page import get_overview_page_service
 
 
 class StubFetcher:
-    def __init__(self, *, inserted_count: int) -> None:
-        self.inserted_count = inserted_count
+    def __init__(self, *, new_activity_found: bool) -> None:
+        self.new_activity_found = new_activity_found
 
-    def fetch_latest_data_and_save(self) -> int:
-        return self.inserted_count
+    def fetch_latest_data_and_save(self) -> bool:
+        return self.new_activity_found
 
 
 @pytest.fixture
@@ -147,7 +147,7 @@ def test_questionnaire_route_shows_neutral_message_when_no_new_activities_found(
 def test_fetch_route_records_inserted_activity_count(*, client: TestClient) -> None:
     sync_service = MagicMock()
     set_fetch_status(status="none")
-    app.dependency_overrides[get_data_fetcher_service] = lambda: StubFetcher(inserted_count=1)
+    app.dependency_overrides[get_data_fetcher_service] = lambda: StubFetcher(new_activity_found=True)
     app.dependency_overrides[get_s3_sync_service] = lambda: sync_service
 
     try:
@@ -160,14 +160,14 @@ def test_fetch_route_records_inserted_activity_count(*, client: TestClient) -> N
 
     assert response.status_code == 303
     assert status_response.status_code == 200
-    assert status_response.json() == {"status": "success", "inserted_count": 1}
+    assert status_response.json() == {"status": "success", "new_activity_found": True}
     sync_service.sync_to_s3_after_fetch.assert_called_once_with()
 
 
 def test_fetch_route_records_zero_inserted_activities(*, client: TestClient) -> None:
     sync_service = MagicMock()
     set_fetch_status(status="none")
-    app.dependency_overrides[get_data_fetcher_service] = lambda: StubFetcher(inserted_count=0)
+    app.dependency_overrides[get_data_fetcher_service] = lambda: StubFetcher(new_activity_found=False)
     app.dependency_overrides[get_s3_sync_service] = lambda: sync_service
 
     try:
@@ -180,7 +180,7 @@ def test_fetch_route_records_zero_inserted_activities(*, client: TestClient) -> 
 
     assert response.status_code == 303
     assert status_response.status_code == 200
-    assert status_response.json() == {"status": "success", "inserted_count": 0}
+    assert status_response.json() == {"status": "success", "new_activity_found": False}
     sync_service.sync_to_s3_after_fetch.assert_called_once_with()
 
 

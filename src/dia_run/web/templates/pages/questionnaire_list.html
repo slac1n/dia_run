@@ -72,7 +72,7 @@
         if (response.ok) {
           const payload = await response.json();
           if (payload.status === "success") {
-            const fetchResult = payload.inserted_count > 0 ? "success" : "no-new";
+            const fetchResult = payload.new_activity_found ? "success" : "no-new";
             window.location.href = `/questionnaire?fetch=${fetchResult}`;
             return;
           } else if (payload.status === "error") {
