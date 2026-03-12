@@ -1,3 +1,14 @@
+## v0.24.0 (2026-03-12)
+
+### Feat
+
+- **TG-39**: optimize dashboard charts for mobile usability (#49)
+
+### Fix
+
+- **TG-33**: only show new data banner for newly inserted activities (#52)
+- **TG-37**: address code review issues for overview page caching (#45)
+
 ## v0.23.0 (2026-03-11)
 
 ### Feat
