@@ -7,19 +7,19 @@ from dia_run.web.fetch_status import get_fetch_status, set_fetch_status
 class TestFetchStatusModule:
     def test_default_status_is_none(self) -> None:
         set_fetch_status(status="none")
-        assert get_fetch_status() == "none"
+        assert get_fetch_status() == {"status": "none", "inserted_count": 0}
 
     def test_set_and_get_started(self) -> None:
         set_fetch_status(status="started")
-        assert get_fetch_status() == "started"
+        assert get_fetch_status() == {"status": "started", "inserted_count": 0}
 
-    def test_set_and_get_success(self) -> None:
-        set_fetch_status(status="success")
-        assert get_fetch_status() == "success"
+    def test_set_and_get_success_with_inserted_count(self) -> None:
+        set_fetch_status(status="success", inserted_count=2)
+        assert get_fetch_status() == {"status": "success", "inserted_count": 2}
 
     def test_set_and_get_error(self) -> None:
         set_fetch_status(status="error")
-        assert get_fetch_status() == "error"
+        assert get_fetch_status() == {"status": "error", "inserted_count": 0}
 
 
 class TestQuestionnaireStatusEndpoint:
@@ -28,25 +28,25 @@ class TestQuestionnaireStatusEndpoint:
         with TestClient(app) as client:
             response = client.get("/questionnaire/status")
             assert response.status_code == 200
-            assert response.json() == {"status": "none"}
+            assert response.json() == {"status": "none", "inserted_count": 0}
 
     def test_returns_started_after_fetch_begins(self) -> None:
         set_fetch_status(status="started")
         with TestClient(app) as client:
             response = client.get("/questionnaire/status")
             assert response.status_code == 200
-            assert response.json() == {"status": "started"}
+            assert response.json() == {"status": "started", "inserted_count": 0}
 
     def test_returns_success_after_fetch_completes(self) -> None:
-        set_fetch_status(status="success")
+        set_fetch_status(status="success", inserted_count=1)
         with TestClient(app) as client:
             response = client.get("/questionnaire/status")
             assert response.status_code == 200
-            assert response.json() == {"status": "success"}
+            assert response.json() == {"status": "success", "inserted_count": 1}
 
     def test_returns_error_after_fetch_fails(self) -> None:
         set_fetch_status(status="error")
         with TestClient(app) as client:
             response = client.get("/questionnaire/status")
             assert response.status_code == 200
-            assert response.json() == {"status": "error"}
+            assert response.json() == {"status": "error", "inserted_count": 0}
