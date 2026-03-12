@@ -153,6 +153,7 @@ class TestNewFeature:
 
 - Cut all feature branches from `develop`
 - Open feature PRs into `develop`; treat `main` as production
+- Never merge feature work directly into `develop`; always use a PR, even for local agent-driven work
 - Do not push directly to `develop` or `main`
 - Only open PRs into `main` from `release/*` or `hotfix/*`
 - PRs into `main` must include a version bump, `uv.lock`, and `CHANGELOG.md`

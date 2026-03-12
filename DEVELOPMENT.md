@@ -4,6 +4,7 @@
 
 - Cut all feature branches from `develop`.
 - Open feature PRs into `develop`; the `Tests` workflow runs there.
+- Never merge feature branches directly into `develop`; always open and merge a PR into `develop`.
 - Treat `main` as the production branch.
 - When you are ready to ship, cut a `release/*` branch from `develop` and prepare the version and changelog there.
 - Promote releases with a `release/*` -> `main` PR; that merge creates the final `v*` tag on `main`.
