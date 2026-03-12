@@ -149,6 +149,27 @@ class TestNewFeature:
 - CI validates PRs into `main`, and tags `main` on release promotion from `release/*` or `hotfix/*`
 - Commit message in bump: `release $current_version -> $new_version [commitizen-skip-ci]`
 
+## Branching And Release Strategy
+
+- Cut all feature branches from `develop`
+- Open feature PRs into `develop`; treat `main` as production
+- Do not push directly to `develop` or `main`
+- Only open PRs into `main` from `release/*` or `hotfix/*`
+- PRs into `main` must include a version bump, `uv.lock`, and `CHANGELOG.md`
+- After a hotfix or release lands on `main`, back-merge it into `develop`
+
+### Release Workflow
+
+- Create `release/<planned-version>` from `develop` when `develop` is ready to ship
+- Prepare release metadata on the release branch with `uvx --from commitizen cz bump --yes --changelog --version-files-only`
+- Commit the release prep changes, open a PR from `release/*` to `main`, then merge the same release branch back into `develop`
+
+### Hotfix Workflow
+
+- Create `hotfix/*` branches from `main`
+- Prepare release metadata on the hotfix branch before opening the PR into `main`
+- After the hotfix is merged to `main`, back-merge it into `develop`
+
 ## Project Structure
 
 ```
