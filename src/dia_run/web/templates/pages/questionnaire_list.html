@@ -72,7 +72,8 @@
         if (response.ok) {
           const payload = await response.json();
           if (payload.status === "success") {
-            window.location.href = "/questionnaire?fetch=success";
+            const fetchResult = payload.new_activity_found ? "success" : "no-new";
+            window.location.href = `/questionnaire?fetch=${fetchResult}`;
             return;
           } else if (payload.status === "error") {
             window.location.href = "/questionnaire?fetch=error";

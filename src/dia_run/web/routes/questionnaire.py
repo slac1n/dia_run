@@ -14,7 +14,7 @@ from dia_run.data_processing.data_processing import DataProcessor
 from dia_run.data_processing.overview_data import invalidate_overview_data_service
 from dia_run.s3_sync import S3DataSync
 from dia_run.web.dependencies import get_data_processor, get_s3_sync_service
-from dia_run.web.fetch_status import FetchStatus, get_fetch_status
+from dia_run.web.fetch_status import FetchState, get_fetch_status
 from dia_run.web.services.overview_page import invalidate_overview_page_service
 from dia_run.web.templates import templates
 
@@ -83,6 +83,11 @@ def questionnaire_list(
             "level": "success",
             "message": "New data downloaded! Please fill out the questionnaire for your new run(s).",
         }
+    elif fetch_status == "no-new":
+        flash = {
+            "level": "info",
+            "message": "Data checked. No new activities found.",
+        }
     elif fetch_status == "error":
         flash = {
             "level": "error",
@@ -107,8 +112,8 @@ def questionnaire_list(
 
 
 @router.get("/status")
-def questionnaire_status() -> dict[str, FetchStatus]:
-    return {"status": get_fetch_status()}
+def questionnaire_status() -> FetchState:
+    return get_fetch_status()
 
 
 @router.get("/{activity_id}", response_class=HTMLResponse)
