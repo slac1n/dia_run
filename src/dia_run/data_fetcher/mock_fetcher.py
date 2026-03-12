@@ -24,7 +24,7 @@ class MockDataFetcher:
         self.QUESTIONNAIRE_DIR.mkdir(parents=True, exist_ok=True)
         self.activity_id_list: list[int] = self._get_existing_activity_ids()
 
-    def fetch_latest_data_and_save(self) -> None:
+    def fetch_latest_data_and_save(self) -> bool:
         activity_id = self._generate_activity_id()
         start_time = datetime.now().replace(second=0, microsecond=0) - timedelta(hours=1)
         duration_minutes = random.randint(25, 90)
@@ -57,6 +57,7 @@ class MockDataFetcher:
 
         logger.info(f"[MOCK] Successfully generated mock activity {activity_id}")
         logger.info("[MOCK] Questionnaire not auto-generated — fill it out via the frontend")
+        return True
 
     def _get_existing_activity_ids(self) -> list[int]:
         delta_log = self.STRAVA_SUMMARY_DIR / "_delta_log"
