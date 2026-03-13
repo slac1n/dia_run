@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -10,6 +10,8 @@ class AppSettings(BaseSettings):
     use_mock_data: bool = False
     data_root: Path = Path("data")
     carelink_token_file: Path = Path("logindata.json")
+    carelink_pre_workout_window_minutes: int = Field(default=240, ge=0)
+    carelink_post_workout_window_minutes: int = Field(default=120, ge=0)
     strava_refresh_token_file: Path | None = None
     s3_sync_enabled: bool = False
     s3_bucket: str | None = None
