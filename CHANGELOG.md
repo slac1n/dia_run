@@ -1,3 +1,9 @@
+## v0.25.0 (2026-03-13)
+
+### Feat
+
+- filter CareLink data to workout windows (#55)
+
 ## v0.24.0 (2026-03-12)
 
 ### Feat
