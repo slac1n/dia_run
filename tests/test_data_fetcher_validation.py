@@ -132,7 +132,9 @@ class TestLiveDataFetcherCareLink:
         ]
         assert df["activity_id"].unique().to_list() == [1234]
 
-    def test_get_carelink_data_keeps_partial_available_window_without_error(self, *, data_paths: DataPaths) -> None:
+    def test_get_carelink_data_keeps_all_rows_when_carelink_returns_less_data_than_window(
+        self, *, data_paths: DataPaths
+    ) -> None:
         activity_start = datetime(2026, 3, 10, 18, 0, 0)
         activity_end = datetime(2026, 3, 10, 19, 0, 0)
         payload = _build_carelink_payload(
