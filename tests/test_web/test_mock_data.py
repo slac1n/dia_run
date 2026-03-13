@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -28,6 +29,11 @@ class TestAppSettings:
         with patch.dict("os.environ", {"USE_MOCK_DATA": "true"}):
             settings = AppSettings()
         assert settings.use_mock_data is True
+
+    def test_carelink_window_defaults(self) -> None:
+        settings = AppSettings()
+        assert settings.carelink_pre_workout_window_minutes == 240
+        assert settings.carelink_post_workout_window_minutes == 120
 
 
 class TestGetDataPaths:
@@ -157,6 +163,24 @@ class TestMockDataFetcher:
 
         assert summary_ids == stream_ids
         assert summary_ids == carelink_ids
+
+    def test_fetch_limits_mock_carelink_to_configured_window(self, *, mock_data_paths: DataPaths) -> None:
+        with (
+            patch("dia_run.data_fetcher.mock_fetcher.settings.carelink_pre_workout_window_minutes", 30),
+            patch("dia_run.data_fetcher.mock_fetcher.settings.carelink_post_workout_window_minutes", 15),
+        ):
+            fetcher = MockDataFetcher(data_paths=mock_data_paths)
+            fetcher.fetch_latest_data_and_save()
+
+        summary_df = pl.read_delta(str(mock_data_paths.strava_summary))
+        carelink_df = pl.read_delta(str(mock_data_paths.carelink))
+        activity_row = summary_df.row(0, named=True)
+        start_time = activity_row["start_date_local"]
+        end_time = start_time + timedelta(seconds=int(activity_row["elapsed_time"]))
+        assert carelink_df["activity_id"].unique().to_list() == [activity_row["activity_id"]]
+
+        assert carelink_df["datetime"].min() == start_time - timedelta(minutes=30)
+        assert carelink_df["datetime"].max() <= end_time + timedelta(minutes=15)
 
 
 class TestFetchRouteWithMockMode:

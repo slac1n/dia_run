@@ -16,6 +16,8 @@ class TestAppSettingsProductionFields:
                 "APP_ENV": "production",
                 "DATA_ROOT": "/tmp/dia-run-data",
                 "CARELINK_TOKEN_FILE": "/tmp/logindata.json",
+                "CARELINK_PRE_WORKOUT_WINDOW_MINUTES": "300",
+                "CARELINK_POST_WORKOUT_WINDOW_MINUTES": "150",
                 "STRAVA_REFRESH_TOKEN_FILE": "/tmp/strava-refresh-token.txt",
                 "S3_SYNC_ENABLED": "true",
                 "S3_BUCKET": "dia-run-bucket",
@@ -31,6 +33,8 @@ class TestAppSettingsProductionFields:
         assert settings.is_production is True
         assert str(settings.data_root) == "/tmp/dia-run-data"
         assert str(settings.carelink_token_file) == "/tmp/logindata.json"
+        assert settings.carelink_pre_workout_window_minutes == 300
+        assert settings.carelink_post_workout_window_minutes == 150
         assert str(settings.strava_refresh_token_file) == "/tmp/strava-refresh-token.txt"
         assert settings.s3_sync_enabled is True
         assert settings.s3_bucket == "dia-run-bucket"

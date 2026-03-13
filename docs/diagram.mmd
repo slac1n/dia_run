@@ -10,6 +10,8 @@ classDiagram
         +bool use_mock_data
         +Path data_root
         +Path carelink_token_file
+        +int carelink_pre_workout_window_minutes
+        +int carelink_post_workout_window_minutes
         +Path | None strava_refresh_token_file
         +bool s3_sync_enabled
         +str | None s3_bucket
@@ -328,6 +330,8 @@ classDiagram
         -Path STRAVA_STREAM_DIR
         -Path CARELINK_DIR
         -int | None latest_activity_id
+        -datetime | None latest_activity_start_datetime
+        -datetime | None latest_activity_end_datetime
         +fetch_latest_data_and_save() bool
     }
 
