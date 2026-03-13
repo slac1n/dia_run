@@ -25,9 +25,13 @@ class LiveDataFetcher:
         self.STRAVA_STREAM_DIR.mkdir(parents=True, exist_ok=True)
         self.CARELINK_DIR.mkdir(parents=True, exist_ok=True)
         self.latest_activity_id: int | None = None
+        self.latest_activity_start_datetime: datetime | None = None
+        self.latest_activity_end_datetime: datetime | None = None
         self.activity_id_list: list[int] = self._get_activity_ids()
 
     def fetch_latest_data_and_save(self) -> bool:
+        self.latest_activity_start_datetime = None
+        self.latest_activity_end_datetime = None
         logger.info("Fetching Strava data...")
         strava_summary_data, strava_stream_data = self._get_strava_data()
         logger.info("Fetching CareLink data...")
@@ -147,6 +151,9 @@ class LiveDataFetcher:
         if da.start_date_local is None:
             raise ValueError("Activity start_date_local is None")
         start_time_local = da.start_date_local
+        elapsed_time_seconds = int(da.elapsed_time) if da.elapsed_time is not None else 0
+        self.latest_activity_start_datetime = start_time_local
+        self.latest_activity_end_datetime = start_time_local + timedelta(seconds=elapsed_time_seconds)
         time_data = streams["time"].data if streams["time"].data is not None else []
         timestamps = [start_time_local + timedelta(seconds=i) for i in time_data]
 
@@ -226,4 +233,24 @@ class LiveDataFetcher:
             pl.lit(self.latest_activity_id).alias("activity_id"),
         ).drop("timestamp")
 
-        return df
+        filtered_df = self._filter_carelink_data_to_activity_window(df=df)
+        logger.info(
+            "Filtered CareLink rows from {} to {} using a {} minute pre-window and {} minute post-window",
+            len(df),
+            len(filtered_df),
+            settings.carelink_pre_workout_window_minutes,
+            settings.carelink_post_workout_window_minutes,
+        )
+        return filtered_df
+
+    def _filter_carelink_data_to_activity_window(self, *, df: pl.DataFrame) -> pl.DataFrame:
+        if self.latest_activity_start_datetime is None or self.latest_activity_end_datetime is None:
+            raise ValueError("Failed to get activity timing. You need to get Strava data first.")
+
+        window_start = self.latest_activity_start_datetime - timedelta(
+            minutes=settings.carelink_pre_workout_window_minutes
+        )
+        window_end = self.latest_activity_end_datetime + timedelta(
+            minutes=settings.carelink_post_workout_window_minutes
+        )
+        return df.filter((pl.col("datetime") >= window_start) & (pl.col("datetime") <= window_end))

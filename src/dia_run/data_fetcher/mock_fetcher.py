@@ -8,6 +8,7 @@ from loguru import logger
 
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.schemas import SpecificCarelinkSchema
+from dia_run.settings import settings
 
 
 class MockDataFetcher:
@@ -34,11 +35,14 @@ class MockDataFetcher:
         summary_df = self._generate_summary(
             activity_id=activity_id, start_time=start_time, duration_minutes=duration_minutes
         )
+        elapsed_time_seconds = int(summary_df["elapsed_time"].item())
         stream_df = self._generate_streams(
             activity_id=activity_id, start_time=start_time, duration_minutes=duration_minutes
         )
         carelink_df = self._generate_carelink(
-            activity_id=activity_id, start_time=start_time, duration_minutes=duration_minutes
+            activity_id=activity_id,
+            start_time=start_time,
+            elapsed_time_seconds=elapsed_time_seconds,
         )
 
         logger.info("[MOCK] Saving strava summary data...")
@@ -127,12 +131,15 @@ class MockDataFetcher:
             pl.when(pl.col("velocity") > 1).then((1000 / pl.col("velocity")) / 60).otherwise(None).alias("pace"),
         )
 
-    def _generate_carelink(self, *, activity_id: int, start_time: datetime, duration_minutes: int) -> pl.DataFrame:
+    def _generate_carelink(self, *, activity_id: int, start_time: datetime, elapsed_time_seconds: int) -> pl.DataFrame:
         data: list[dict[str, object]] = []
+        pre_window = timedelta(minutes=settings.carelink_pre_workout_window_minutes)
+        post_window = timedelta(minutes=settings.carelink_post_workout_window_minutes)
+        activity_end = start_time + timedelta(seconds=elapsed_time_seconds)
 
-        # CGM readings every 5 minutes, starting 3 hours before and ending 30 min after the run
-        cgm_start = start_time - timedelta(hours=3)
-        cgm_end = start_time + timedelta(minutes=duration_minutes + 30)
+        # CGM readings every 5 minutes inside the persisted CareLink window
+        cgm_start = start_time - pre_window
+        cgm_end = activity_end + post_window
         current = cgm_start
         base_glucose = random.uniform(120, 180)
         while current <= cgm_end:
@@ -147,8 +154,8 @@ class MockDataFetcher:
             )
             current += timedelta(minutes=5)
 
-        # AUTO_BASAL_DELIVERY every 5 minutes for the pre-run window
-        basal_current = start_time - timedelta(hours=3)
+        # AUTO_BASAL_DELIVERY every 5 minutes for the configured pre-run window
+        basal_current = start_time - pre_window
         while basal_current < start_time:
             data.append(
                 {
@@ -161,9 +168,12 @@ class MockDataFetcher:
             basal_current += timedelta(minutes=5)
 
         # One INSULIN bolus before the run
+        max_bolus_offset_minutes = max(0, min(120, settings.carelink_pre_workout_window_minutes))
+        min_bolus_offset_minutes = min(30, max_bolus_offset_minutes)
         data.append(
             {
-                "datetime": start_time - timedelta(minutes=random.randint(30, 120)),
+                "datetime": start_time
+                - timedelta(minutes=random.randint(min_bolus_offset_minutes, max_bolus_offset_minutes)),
                 "type": "INSULIN",
                 "value": round(random.uniform(0.5, 4.0), 1),
                 "activity_id": activity_id,
