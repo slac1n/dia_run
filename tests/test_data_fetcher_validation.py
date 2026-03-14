@@ -290,6 +290,23 @@ class TestLiveDataFetcherCareLink:
             with pytest.raises(CareLinkDataStaleError, match="CareLink data is out of date"):
                 fetcher._get_carelink_data()
 
+    def test_get_latest_cgm_timestamp_raises_when_sgs_is_empty(self, *, data_paths: DataPaths) -> None:
+        activity_start = datetime(2026, 3, 10, 18, 0, 0)
+        payload = _build_carelink_payload(sgs=[], markers=[])
+        mock_client = MagicMock()
+        mock_client.init.return_value = True
+        mock_client.getRecentData.return_value = payload
+
+        with patch("dia_run.data_fetcher.live_fetcher.CareLinkClient", return_value=mock_client):
+            fetcher = LiveDataFetcher(data_paths=data_paths)
+            fetcher.latest_activity_id = 1234
+            fetcher.activity_id_list = []
+            fetcher.latest_activity_start_datetime = activity_start
+            fetcher.latest_activity_end_datetime = activity_start + timedelta(minutes=30)
+
+            with pytest.raises(ValueError, match="CareLink API response did not include any CGM readings"):
+                fetcher._get_carelink_data()
+
     def test_fetch_latest_data_and_save_aborts_before_any_write_when_carelink_is_stale(
         self, *, data_paths: DataPaths
     ) -> None:
