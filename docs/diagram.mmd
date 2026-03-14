@@ -12,6 +12,8 @@ classDiagram
         +Path carelink_token_file
         +int carelink_pre_workout_window_minutes
         +int carelink_post_workout_window_minutes
+        +int carelink_stale_threshold_minutes
+        +str server_timezone
         +Path | None strava_refresh_token_file
         +bool s3_sync_enabled
         +str | None s3_bucket
@@ -325,6 +327,10 @@ classDiagram
         +fetch_latest_data_and_save() bool
     }
 
+    class CareLinkDataStaleError {
+        <<exception>>
+    }
+
     class LiveDataFetcher {
         -Path STRAVA_SUMMARY_DIR
         -Path STRAVA_STREAM_DIR
@@ -379,6 +385,7 @@ classDiagram
     LiveDataFetcher --> StravaActivitySummary
     LiveDataFetcher --> StravaStreamData
     LiveDataFetcher --> CareLinkResponse
+    LiveDataFetcher ..> CareLinkDataStaleError
     MockDataFetcher --> DataPaths
     RunFuelQuestionnaire --> DataPaths
     RunFuelQuestionnaire --> QuestionnaireModel

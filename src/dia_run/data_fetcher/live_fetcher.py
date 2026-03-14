@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandera.errors as pandera_errors
 import polars as pl
@@ -7,6 +8,7 @@ from loguru import logger
 from stravalib.client import Client
 
 from dia_run.data_fetcher.carelink_client import CareLinkClient
+from dia_run.data_fetcher.exceptions import CareLinkDataStaleError
 from dia_run.data_fetcher.strava_client import get_strava_client, stream_last_activity
 from dia_run.data_models.api_responses import CareLinkResponse, StravaActivitySummary, StravaStreamData
 from dia_run.data_models.paths import DataPaths
@@ -41,11 +43,6 @@ class LiveDataFetcher:
             logger.info("Saving strava summary data...")
             strava_summary_data.write_delta(self.STRAVA_SUMMARY_DIR, mode="append")
         if carelink_data is not None:
-            logger.info("Validating carelink data...")
-            try:
-                SpecificCarelinkSchema.validate(carelink_data)
-            except pandera_errors.SchemaError as e:
-                raise ValueError(f"CareLink data validation failed: {e}") from e
             logger.info("Saving carelink data...")
             carelink_data.write_delta(self.CARELINK_DIR, mode="append")
         if strava_stream_data is not None:
@@ -192,23 +189,22 @@ class LiveDataFetcher:
         except Exception as e:
             raise ValueError(f"CareLink API response validation failed: {e}") from e
 
+        self._ensure_carelink_data_is_fresh(validated_carelink_data=validated_carelink_data)
+
         if self.latest_activity_id is None:
             raise ValueError("Failed to get latest activity ID. You need to get Strava data first.")
 
-        df = pl.DataFrame([reading.model_dump() for reading in validated_carelink_data.patientData.sgs])
-
-        df = (
-            df.with_columns(pl.lit("CGM").alias("type"), pl.col("sg").cast(pl.Float64))
-            .rename({"sg": "value"})
-            .select(
-                [
-                    "timestamp",
-                    "type",
-                    "value",
-                ]
+        carelink_rows: list[dict[str, datetime | float | int | None | str]] = []
+        for reading in validated_carelink_data.patientData.sgs:
+            carelink_rows.append(
+                {
+                    "datetime": self._parse_carelink_timestamp(raw_timestamp=reading.timestamp),
+                    "type": "CGM",
+                    "value": reading.sg,
+                    "activity_id": self.latest_activity_id,
+                }
             )
-        )
-        marker_extraction = []
+
         for marker in validated_carelink_data.patientData.markers:
             marker_data = marker.model_dump()
             if marker_data["type"] == "AUTO_BASAL_DELIVERY":
@@ -217,21 +213,20 @@ class LiveDataFetcher:
                 value = float(marker_data["data"]["dataValues"]["deliveredFastAmount"])
             else:
                 value = None
-            marker_extraction.append(
+            carelink_rows.append(
                 {
-                    "timestamp": marker_data["timestamp"],
+                    "datetime": self._parse_carelink_timestamp(raw_timestamp=str(marker_data["timestamp"])),
                     "type": marker_data["type"],
                     "value": value,
+                    "activity_id": self.latest_activity_id,
                 }
             )
-        df_marker = pl.DataFrame(marker_extraction)
 
-        df = df.vstack(df_marker)
-
-        df = df.with_columns(
-            pl.col("timestamp").str.strptime(pl.Datetime, "%Y-%m-%dT%H:%M:%S").alias("datetime"),
-            pl.lit(self.latest_activity_id).alias("activity_id"),
-        ).drop("timestamp")
+        df = pl.DataFrame(carelink_rows).with_columns(
+            pl.col("datetime").cast(pl.Datetime),
+            pl.col("value").cast(pl.Float64),
+            pl.col("activity_id").cast(pl.Int64),
+        )
 
         filtered_df = self._filter_carelink_data_to_activity_window(df=df)
         logger.info(
@@ -241,7 +236,65 @@ class LiveDataFetcher:
             settings.carelink_pre_workout_window_minutes,
             settings.carelink_post_workout_window_minutes,
         )
+
+        logger.info("Validating carelink data...")
+        try:
+            SpecificCarelinkSchema.validate(filtered_df)
+        except pandera_errors.SchemaError as e:
+            raise ValueError(f"CareLink data validation failed: {e}") from e
+
         return filtered_df
+
+    def _ensure_carelink_data_is_fresh(self, *, validated_carelink_data: CareLinkResponse) -> None:
+        latest_cgm_raw_timestamp, latest_cgm_timestamp = self._get_latest_cgm_timestamp(
+            validated_carelink_data=validated_carelink_data
+        )
+        current_server_time = self._get_current_server_time()
+        staleness_age = current_server_time - latest_cgm_timestamp
+        threshold = timedelta(minutes=settings.carelink_stale_threshold_minutes)
+        is_stale = staleness_age > threshold
+
+        logger.info(
+            "CareLink staleness check result={} latest_cgm_raw_timestamp={} latest_cgm_timestamp={} "
+            "current_server_time={} server_timezone={} threshold_minutes={} age_minutes={}",
+            "stale" if is_stale else "fresh",
+            latest_cgm_raw_timestamp,
+            latest_cgm_timestamp.isoformat(),
+            current_server_time.isoformat(),
+            settings.server_timezone,
+            settings.carelink_stale_threshold_minutes,
+            round(staleness_age.total_seconds() / 60, 2),
+        )
+
+        if is_stale:
+            raise CareLinkDataStaleError("CareLink data is out of date. Please retry later.")
+
+    def _get_latest_cgm_timestamp(self, *, validated_carelink_data: CareLinkResponse) -> tuple[str, datetime]:
+        latest_raw_timestamp: str | None = None
+        latest_timestamp: datetime | None = None
+
+        for reading in validated_carelink_data.patientData.sgs:
+            parsed_timestamp = self._parse_carelink_timestamp(raw_timestamp=reading.timestamp)
+            if latest_timestamp is None or parsed_timestamp > latest_timestamp:
+                latest_timestamp = parsed_timestamp
+                latest_raw_timestamp = reading.timestamp
+
+        if latest_raw_timestamp is None or latest_timestamp is None:
+            raise ValueError("CareLink API response did not include any CGM readings")
+
+        return latest_raw_timestamp, latest_timestamp
+
+    def _parse_carelink_timestamp(self, *, raw_timestamp: str) -> datetime:
+        parsed_timestamp = datetime.fromisoformat(raw_timestamp.replace("Z", "+00:00"))
+        if parsed_timestamp.tzinfo is None:
+            return parsed_timestamp
+        return parsed_timestamp.astimezone(self._get_server_timezone()).replace(tzinfo=None)
+
+    def _get_current_server_time(self) -> datetime:
+        return datetime.now(tz=self._get_server_timezone()).replace(tzinfo=None)
+
+    def _get_server_timezone(self) -> ZoneInfo:
+        return ZoneInfo(settings.server_timezone)
 
     def _filter_carelink_data_to_activity_window(self, *, df: pl.DataFrame) -> pl.DataFrame:
         if self.latest_activity_start_datetime is None or self.latest_activity_end_datetime is None:

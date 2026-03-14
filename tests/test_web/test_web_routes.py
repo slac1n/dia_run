@@ -7,6 +7,7 @@ import polars as pl
 import pytest
 from fastapi.testclient import TestClient
 
+from dia_run.data_fetcher.exceptions import CareLinkDataStaleError
 from dia_run.data_models.paths import DataPaths
 from dia_run.web.app import app
 from dia_run.web.dependencies import get_data_fetcher_service, get_data_paths, get_s3_sync_service
@@ -20,6 +21,11 @@ class StubFetcher:
 
     def fetch_latest_data_and_save(self) -> bool:
         return self.new_activity_found
+
+
+class StaleFetcher:
+    def fetch_latest_data_and_save(self) -> bool:
+        raise CareLinkDataStaleError("CareLink data is out of date. Please retry later.")
 
 
 @pytest.fixture
@@ -144,6 +150,13 @@ def test_questionnaire_route_shows_neutral_message_when_no_new_activities_found(
     assert "New data downloaded! Please fill out the questionnaire for your new run(s)." not in response.text
 
 
+def test_questionnaire_route_shows_stale_carelink_message(*, client: TestClient) -> None:
+    response = client.get("/questionnaire?fetch=stale")
+
+    assert response.status_code == 200
+    assert "CareLink data is out of date. Please retry later." in response.text
+
+
 def test_fetch_route_records_inserted_activity_count(*, client: TestClient) -> None:
     sync_service = MagicMock()
     set_fetch_status(status="none")
@@ -182,6 +195,26 @@ def test_fetch_route_records_zero_inserted_activities(*, client: TestClient) -> 
     assert status_response.status_code == 200
     assert status_response.json() == {"status": "success", "new_activity_found": False}
     sync_service.sync_to_s3_after_fetch.assert_called_once_with()
+
+
+def test_fetch_route_records_stale_carelink_status(*, client: TestClient) -> None:
+    sync_service = MagicMock()
+    set_fetch_status(status="none")
+    app.dependency_overrides[get_data_fetcher_service] = lambda: StaleFetcher()
+    app.dependency_overrides[get_s3_sync_service] = lambda: sync_service
+
+    try:
+        response = client.post("/fetch", follow_redirects=False)
+        status_response = client.get("/questionnaire/status")
+    finally:
+        app.dependency_overrides.pop(get_data_fetcher_service, None)
+        app.dependency_overrides.pop(get_s3_sync_service, None)
+        set_fetch_status(status="none")
+
+    assert response.status_code == 303
+    assert status_response.status_code == 200
+    assert status_response.json() == {"status": "stale", "new_activity_found": False}
+    sync_service.sync_to_s3_after_fetch.assert_not_called()
 
 
 def test_questionnaire_submission(*, client: TestClient, web_data_paths: DataPaths) -> None:
