@@ -1,5 +1,7 @@
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any, cast
 from zoneinfo import ZoneInfo
 
 import pandera.errors as pandera_errors
@@ -46,8 +48,13 @@ class LiveDataFetcher:
             logger.info("Saving carelink data...")
             carelink_data.write_delta(self.CARELINK_DIR, mode="append")
         if strava_stream_data is not None:
-            logger.info("Saving strava stream data...")
-            strava_stream_data.write_delta(self.STRAVA_STREAM_DIR, mode="append")
+            if strava_stream_data.is_empty():
+                logger.warning(
+                    "No Strava stream rows available for activity {}. Skipping stream write.", self.latest_activity_id
+                )
+            else:
+                logger.info("Saving strava stream data...")
+                strava_stream_data.write_delta(self.STRAVA_STREAM_DIR, mode="append")
 
         return strava_summary_data is not None
 
@@ -91,83 +98,213 @@ class LiveDataFetcher:
             raise ValueError("Failed to get latest activity ID")
 
         da = client.get_activity(self.latest_activity_id)
+        if da.start_date_local is None:
+            raise ValueError("Activity start_date_local is None")
+
+        start_time_local = da.start_date_local
+
+        summary_data: dict[str, list[Any]] = {
+            "activity_id": [self.latest_activity_id],
+            "name": [str(da.name) if da.name is not None else ""],
+            "start_date_local": [start_time_local],
+            "distance": [float(da.distance) if da.distance is not None else 0.0],
+            "moving_time": [int(da.moving_time) if da.moving_time is not None else 0],
+            "elapsed_time": [int(da.elapsed_time) if da.elapsed_time is not None else 0],
+            "total_elevation_gain": [float(da.total_elevation_gain) if da.total_elevation_gain is not None else 0.0],
+            "average_heartrate": [float(da.average_heartrate) if da.average_heartrate is not None else None],
+            "max_heartrate": [int(da.max_heartrate) if da.max_heartrate is not None else None],
+            "average_speed": [float(da.average_speed) if da.average_speed is not None else None],
+            "max_speed": [float(da.max_speed) if da.max_speed is not None else None],
+            "average_watts": [float(da.average_watts) if da.average_watts is not None else None],
+            "max_watts": [int(da.max_watts) if da.max_watts is not None else None],
+            "kilojoules": [float(da.kilojoules) if da.kilojoules is not None else None],
+        }
 
         StravaActivitySummary(
             id=int(da.id) if da.id is not None else 0,
             name=str(da.name) if da.name is not None else "",
-            start_date_local=da.start_date_local if da.start_date_local is not None else datetime.now(),
+            start_date_local=start_time_local,
             distance=float(da.distance) if da.distance is not None else 0.0,
             moving_time=int(da.moving_time) if da.moving_time is not None else 0,
             elapsed_time=int(da.elapsed_time) if da.elapsed_time is not None else 0,
             total_elevation_gain=float(da.total_elevation_gain) if da.total_elevation_gain is not None else 0.0,
-            average_heartrate=float(da.average_heartrate) if da.average_heartrate else None,
-            max_heartrate=float(da.max_heartrate) if da.max_heartrate else None,
-            average_speed=float(da.average_speed) if da.average_speed else None,
-            max_speed=float(da.max_speed) if da.max_speed else None,
-            average_watts=float(da.average_watts) if da.average_watts else None,
-            max_watts=float(da.max_watts) if da.max_watts else None,
-            kilojoules=float(da.kilojoules) if da.kilojoules else None,
+            average_heartrate=float(da.average_heartrate) if da.average_heartrate is not None else None,
+            max_heartrate=float(da.max_heartrate) if da.max_heartrate is not None else None,
+            average_speed=float(da.average_speed) if da.average_speed is not None else None,
+            max_speed=float(da.max_speed) if da.max_speed is not None else None,
+            average_watts=float(da.average_watts) if da.average_watts is not None else None,
+            max_watts=float(da.max_watts) if da.max_watts is not None else None,
+            kilojoules=float(da.kilojoules) if da.kilojoules is not None else None,
         )
 
         stream_types = ["time", "heartrate", "watts", "velocity_smooth", "moving"]
         streams = client.get_activity_streams(self.latest_activity_id, types=stream_types, series_type="time")
 
+        time_data = self._get_time_stream_values(streams=streams)
+        if not time_data:
+            logger.warning(
+                "Strava activity {} is missing a usable time stream. Saving summary only.", self.latest_activity_id
+            )
+            return self._build_summary_dataframe(summary_data=summary_data), self._build_empty_stream_dataframe()
+
+        heartrate_data = [
+            int(value) if value is not None else None
+            for value in self._get_optional_stream_values(
+                streams=streams,
+                stream_name="heartrate",
+                expected_length=len(time_data),
+            )
+        ]
+        watts_data = [
+            float(value) if value is not None else None
+            for value in self._get_optional_stream_values(
+                streams=streams,
+                stream_name="watts",
+                expected_length=len(time_data),
+            )
+        ]
+        velocity_data = [
+            float(value) if value is not None else None
+            for value in self._get_optional_stream_values(
+                streams=streams,
+                stream_name="velocity_smooth",
+                expected_length=len(time_data),
+            )
+        ]
+        moving_data = [
+            bool(value) if value is not None else None
+            for value in self._get_optional_stream_values(
+                streams=streams,
+                stream_name="moving",
+                expected_length=len(time_data),
+            )
+        ]
+
         StravaStreamData(
-            time=list(streams["time"].data) if streams["time"].data is not None else [],
-            heartrate=list(streams["heartrate"].data) if streams["heartrate"].data is not None else [],
-            watts=list(streams["watts"].data) if streams["watts"].data is not None else [],
-            velocity_smooth=list(streams["velocity_smooth"].data)
-            if streams["velocity_smooth"].data is not None
-            else [],
-            moving=list(streams["moving"].data) if streams["moving"].data is not None else [],
+            time=time_data,
+            heartrate=heartrate_data,
+            watts=watts_data,
+            velocity_smooth=velocity_data,
+            moving=moving_data,
         )
 
-        df_summary = pl.DataFrame(
-            {
-                "activity_id": [self.latest_activity_id],
-                "name": [da.name],
-                "start_date_local": [da.start_date_local],
-                "distance": [da.distance],
-                "moving_time": [da.moving_time],
-                "elapsed_time": [da.elapsed_time],
-                "total_elevation_gain": [da.total_elevation_gain],
-                "average_heartrate": [da.average_heartrate],
-                "max_heartrate": [da.max_heartrate],
-                "average_speed": [da.average_speed],
-                "max_speed": [da.max_speed],
-                "average_watts": [da.average_watts],
-                "max_watts": [da.max_watts],
-                "kilojoules": [da.kilojoules],
-            }
-        ).with_columns(
-            pl.col("start_date_local").cast(pl.Datetime),
-            ((1000 / pl.col("average_speed")) / 60).alias("average_pace"),
-            ((1000 / pl.col("max_speed")) / 60).alias("max_pace"),
-        )
+        df_summary = self._build_summary_dataframe(summary_data=summary_data)
 
-        if da.start_date_local is None:
-            raise ValueError("Activity start_date_local is None")
-        start_time_local = da.start_date_local
         elapsed_time_seconds = int(da.elapsed_time) if da.elapsed_time is not None else 0
         self.latest_activity_start_datetime = start_time_local
         self.latest_activity_end_datetime = start_time_local + timedelta(seconds=elapsed_time_seconds)
-        time_data = streams["time"].data if streams["time"].data is not None else []
         timestamps = [start_time_local + timedelta(seconds=i) for i in time_data]
 
         df_streams = pl.DataFrame(
             {
                 "datetime": timestamps,
-                "heartrate": streams["heartrate"].data if streams["heartrate"].data is not None else [],
-                "power": streams["watts"].data if streams["watts"].data is not None else [],
-                "velocity": streams["velocity_smooth"].data if streams["velocity_smooth"].data is not None else [],
-                "moving": streams["moving"].data if streams["moving"].data is not None else [],
+                "heartrate": heartrate_data,
+                "power": watts_data,
+                "velocity": velocity_data,
+                "moving": moving_data,
             }
         ).with_columns(
             pl.col("datetime").cast(pl.Datetime),
-            pl.lit(self.latest_activity_id).alias("activity_id"),
-            pl.when(pl.col("velocity") > 1).then((1000 / pl.col("velocity")) / 60).otherwise(None).alias("pace"),
+            pl.col("heartrate").cast(pl.Int64),
+            pl.col("power").cast(pl.Float64),
+            pl.col("velocity").cast(pl.Float64),
+            pl.col("moving").cast(pl.Boolean),
+            pl.lit(self.latest_activity_id).cast(pl.Int64).alias("activity_id"),
+            pl.when(pl.col("velocity").is_not_null() & (pl.col("velocity") > 1))
+            .then((1000 / pl.col("velocity")) / 60)
+            .otherwise(None)
+            .alias("pace"),
         )
         return (df_summary, df_streams)
+
+    def _build_summary_dataframe(self, *, summary_data: dict[str, list[Any]]) -> pl.DataFrame:
+        return pl.DataFrame(summary_data).with_columns(
+            pl.col("activity_id").cast(pl.Int64),
+            pl.col("name").cast(pl.Utf8),
+            pl.col("start_date_local").cast(pl.Datetime),
+            pl.col("distance").cast(pl.Float64),
+            pl.col("moving_time").cast(pl.Int64),
+            pl.col("elapsed_time").cast(pl.Int64),
+            pl.col("total_elevation_gain").cast(pl.Float64),
+            pl.col("average_heartrate").cast(pl.Float64),
+            pl.col("max_heartrate").cast(pl.Int64),
+            pl.col("average_speed").cast(pl.Float64),
+            pl.col("max_speed").cast(pl.Float64),
+            pl.col("average_watts").cast(pl.Float64),
+            pl.col("max_watts").cast(pl.Int64),
+            pl.col("kilojoules").cast(pl.Float64),
+            pl.when(pl.col("average_speed").is_not_null() & (pl.col("average_speed") > 0))
+            .then((1000 / pl.col("average_speed")) / 60)
+            .otherwise(None)
+            .alias("average_pace"),
+            pl.when(pl.col("max_speed").is_not_null() & (pl.col("max_speed") > 0))
+            .then((1000 / pl.col("max_speed")) / 60)
+            .otherwise(None)
+            .alias("max_pace"),
+        )
+
+    def _build_empty_stream_dataframe(self) -> pl.DataFrame:
+        return pl.DataFrame(
+            schema={
+                "datetime": pl.Datetime,
+                "heartrate": pl.Int64,
+                "power": pl.Float64,
+                "velocity": pl.Float64,
+                "moving": pl.Boolean,
+                "activity_id": pl.Int64,
+                "pace": pl.Float64,
+            }
+        )
+
+    def _get_time_stream_values(self, *, streams: dict[str, Any]) -> list[int]:
+        time_stream = streams.get("time")
+        raw_data = cast(Sequence[Any] | None, getattr(time_stream, "data", None))
+
+        if raw_data is None:
+            return []
+
+        return [int(value) for value in raw_data]
+
+    def _get_optional_stream_values(
+        self,
+        *,
+        streams: dict[str, Any],
+        stream_name: str,
+        expected_length: int,
+    ) -> list[Any | None]:
+        stream = streams.get(stream_name)
+        raw_data = cast(Sequence[Any] | None, getattr(stream, "data", None))
+
+        if stream is None:
+            logger.info("Strava activity stream '{}' is missing for activity {}", stream_name, self.latest_activity_id)
+            return [None] * expected_length
+
+        if raw_data is None:
+            logger.info("Strava activity stream '{}' has no data for activity {}", stream_name, self.latest_activity_id)
+            return [None] * expected_length
+
+        values = list(raw_data)
+        if len(values) == expected_length:
+            return values
+
+        if len(values) > expected_length:
+            logger.warning(
+                "Strava activity stream '{}' has {} rows but time has {} for activity {}. Truncating.",
+                stream_name,
+                len(values),
+                expected_length,
+                self.latest_activity_id,
+            )
+            return values[:expected_length]
+
+        logger.warning(
+            "Strava activity stream '{}' has {} rows but time has {} for activity {}. Padding with nulls.",
+            stream_name,
+            len(values),
+            expected_length,
+            self.latest_activity_id,
+        )
+        return values + [None] * (expected_length - len(values))
 
     def _get_carelink_data(self) -> pl.DataFrame | None:
         if self.latest_activity_id in self.activity_id_list:
