@@ -34,6 +34,12 @@ class TestAppSettings:
         settings = AppSettings()
         assert settings.carelink_pre_workout_window_minutes == 240
         assert settings.carelink_post_workout_window_minutes == 120
+        assert settings.carelink_stale_threshold_minutes == 120
+        assert settings.server_timezone == "Europe/Berlin"
+
+    def test_server_timezone_must_be_valid(self) -> None:
+        with pytest.raises(ValueError, match="Unknown server timezone"):
+            AppSettings(server_timezone="Mars/Olympus")
 
 
 class TestGetDataPaths:

@@ -1,6 +1,6 @@
 from typing import Literal, TypedDict
 
-FetchStatus = Literal["none", "started", "success", "error"]
+FetchStatus = Literal["none", "started", "success", "error", "stale"]
 
 
 class FetchState(TypedDict):

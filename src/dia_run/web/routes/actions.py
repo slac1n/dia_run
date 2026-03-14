@@ -4,6 +4,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends
 from fastapi.responses import RedirectResponse
 from loguru import logger
 
+from dia_run.data_fetcher.exceptions import CareLinkDataStaleError
 from dia_run.data_fetcher.fetcher_protocol import DataFetcherService
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_processing.overview_data import invalidate_overview_data_service
@@ -23,6 +24,9 @@ def _fetch_data_task(*, fetcher: DataFetcherService, sync_service: S3DataSync, d
         invalidate_overview_page_service(data_paths=data_paths)
         sync_service.sync_to_s3_after_fetch()
         set_fetch_status(status="success", new_activity_found=new_activity_found)
+    except CareLinkDataStaleError as exc:
+        logger.warning("Data fetch aborted: {error}", error=str(exc))
+        set_fetch_status(status="stale")
     except ValueError as exc:
         logger.error("Data fetch failed: {error}", error=str(exc))
         set_fetch_status(status="error")

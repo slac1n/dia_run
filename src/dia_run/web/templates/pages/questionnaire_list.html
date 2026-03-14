@@ -75,6 +75,9 @@
             const fetchResult = payload.new_activity_found ? "success" : "no-new";
             window.location.href = `/questionnaire?fetch=${fetchResult}`;
             return;
+          } else if (payload.status === "stale") {
+            window.location.href = "/questionnaire?fetch=stale";
+            return;
           } else if (payload.status === "error") {
             window.location.href = "/questionnaire?fetch=error";
             return;
