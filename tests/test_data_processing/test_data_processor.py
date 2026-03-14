@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import polars as pl
 
@@ -54,6 +55,43 @@ class TestDataProcessor:
         assert result.filter(pl.col("activity_id") == 1003)["human_readable_pace"].item() == "6:00"
         # Activity 1004: 6.17 min/km = 6:10 -> "6:10"
         assert result.filter(pl.col("activity_id") == 1004)["human_readable_pace"].item() == "6:10"
+
+    def test_get_summary_allows_missing_watts(self, *, test_data_paths: DataPaths, tmp_path: Path) -> None:
+        indoor_root = tmp_path / "indoor_run_missing_watts"
+        indoor_paths = DataPaths.from_root(root=indoor_root)
+
+        for path in (
+            indoor_paths.carelink,
+            indoor_paths.strava_summary,
+            indoor_paths.strava_stream,
+            indoor_paths.questionnaire,
+        ):
+            path.mkdir(parents=True, exist_ok=True)
+
+        summary_df = pl.read_delta(str(test_data_paths.strava_summary)).with_columns(
+            pl.when(pl.col("activity_id") == 1002).then(None).otherwise(pl.col("average_watts")).alias("average_watts"),
+            pl.when(pl.col("activity_id") == 1002).then(None).otherwise(pl.col("max_watts")).alias("max_watts"),
+            pl.when(pl.col("activity_id") == 1002).then(None).otherwise(pl.col("kilojoules")).alias("kilojoules"),
+        )
+        stream_df = pl.read_delta(str(test_data_paths.strava_stream))
+        carelink_df = pl.read_delta(str(test_data_paths.carelink))
+
+        summary_df.write_delta(str(indoor_paths.strava_summary))
+        stream_df.write_delta(str(indoor_paths.strava_stream))
+        carelink_df.write_delta(str(indoor_paths.carelink))
+
+        for questionnaire_path in test_data_paths.questionnaire.glob("*.json"):
+            target_path = indoor_paths.questionnaire / questionnaire_path.name
+            target_path.write_text(questionnaire_path.read_text(encoding="utf-8"), encoding="utf-8")
+
+        processor = DataProcessor(indoor_paths)
+        result = processor.get_summary()
+
+        SummarySchema.validate(result)
+        row_1002 = result.filter(pl.col("activity_id") == 1002)
+        assert row_1002["average_watts"].item() is None
+        assert row_1002["max_watts"].item() is None
+        assert row_1002["kilojoules"].item() is None
 
     def test_get_pending_questionnaire_count(self, test_data_paths: DataPaths) -> None:
         processor = DataProcessor(test_data_paths)
