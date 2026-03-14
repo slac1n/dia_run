@@ -18,6 +18,8 @@ class TestAppSettingsProductionFields:
                 "CARELINK_TOKEN_FILE": "/tmp/logindata.json",
                 "CARELINK_PRE_WORKOUT_WINDOW_MINUTES": "300",
                 "CARELINK_POST_WORKOUT_WINDOW_MINUTES": "150",
+                "CARELINK_STALE_THRESHOLD_MINUTES": "90",
+                "SERVER_TIMEZONE": "Europe/Paris",
                 "STRAVA_REFRESH_TOKEN_FILE": "/tmp/strava-refresh-token.txt",
                 "S3_SYNC_ENABLED": "true",
                 "S3_BUCKET": "dia-run-bucket",
@@ -35,6 +37,8 @@ class TestAppSettingsProductionFields:
         assert str(settings.carelink_token_file) == "/tmp/logindata.json"
         assert settings.carelink_pre_workout_window_minutes == 300
         assert settings.carelink_post_workout_window_minutes == 150
+        assert settings.carelink_stale_threshold_minutes == 90
+        assert settings.server_timezone == "Europe/Paris"
         assert str(settings.strava_refresh_token_file) == "/tmp/strava-refresh-token.txt"
         assert settings.s3_sync_enabled is True
         assert settings.s3_bucket == "dia-run-bucket"

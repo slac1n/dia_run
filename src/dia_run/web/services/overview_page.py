@@ -49,29 +49,28 @@ class OverviewPageService:
         self.data_paths = data_paths
         self.overview_data_service = overview_data_service
         self._lock = Lock()
-        self._cached_data_id: int | None = None
+        self._cached_dashboard_data: DashboardOverviewData | None = None
         self._cached_context: DashboardOverviewContext | None = None
 
     def get_dashboard_context(self) -> DashboardOverviewContext:
         dashboard_data = self.overview_data_service.get_dashboard_data()
-        data_identity = id(dashboard_data)
 
         with self._lock:
-            if self._cached_data_id == data_identity and self._cached_context is not None:
+            if self._cached_dashboard_data is dashboard_data and self._cached_context is not None:
                 logger.debug("Serving cached dashboard overview for data root {}", self.data_paths.data_root)
                 return self._cached_context
 
         dashboard_context = self._build_dashboard_context(dashboard_data=dashboard_data)
 
         with self._lock:
-            self._cached_data_id = data_identity
+            self._cached_dashboard_data = dashboard_data
             self._cached_context = dashboard_context
 
         return dashboard_context
 
     def invalidate(self) -> None:
         with self._lock:
-            self._cached_data_id = None
+            self._cached_dashboard_data = None
             self._cached_context = None
 
     def _build_dashboard_context(self, *, dashboard_data: DashboardOverviewData) -> DashboardOverviewContext:

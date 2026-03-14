@@ -93,6 +93,11 @@ def questionnaire_list(
             "level": "error",
             "message": "Data fetch failed. Check the logs for details.",
         }
+    elif fetch_status == "stale":
+        flash = {
+            "level": "error",
+            "message": "CareLink data is out of date. Please retry later.",
+        }
     else:
         flash = None
 

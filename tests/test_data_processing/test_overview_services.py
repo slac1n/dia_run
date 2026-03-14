@@ -198,7 +198,7 @@ class TestOverviewPageService:
         page_service.invalidate()
 
         assert page_service._cached_context is None  # noqa: SLF001
-        assert page_service._cached_data_id is None  # noqa: SLF001
+        assert page_service._cached_dashboard_data is None  # noqa: SLF001
 
     def test_charts_contain_expected_keys(self, *, test_data_paths: DataPaths) -> None:
         data_service = OverviewDataService(data_paths=test_data_paths)
