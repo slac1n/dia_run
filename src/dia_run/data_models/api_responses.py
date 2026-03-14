@@ -31,10 +31,10 @@ class StravaActivitySummary(BaseModel):
 
 class StravaStreamData(BaseModel):
     time: Sequence[int]
-    heartrate: Sequence[float | None]
+    heartrate: Sequence[int | None]
     watts: Sequence[float | None]
     velocity_smooth: Sequence[float | None]
-    moving: Sequence[bool]
+    moving: Sequence[bool | None]
 
 
 class CareLinkGlucoseReading(BaseModel):

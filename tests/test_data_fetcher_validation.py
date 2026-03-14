@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -357,3 +358,189 @@ class TestLiveDataFetcherCareLink:
         assert not (data_paths.strava_summary / "_delta_log").exists()
         assert not (data_paths.strava_stream / "_delta_log").exists()
         assert not (data_paths.carelink / "_delta_log").exists()
+
+
+class TestLiveDataFetcherStrava:
+    @pytest.fixture
+    def data_paths(self, *, tmp_path: Path) -> DataPaths:
+        return DataPaths(
+            strava_summary=tmp_path / "strava" / "summary",
+            strava_stream=tmp_path / "strava" / "stream",
+            carelink=tmp_path / "carelink",
+            questionnaire=tmp_path / "questionnaire",
+        )
+
+    def test_process_latest_activity_id_handles_missing_optional_streams(self, *, data_paths: DataPaths) -> None:
+        activity_start = datetime(2026, 3, 10, 18, 0, 0)
+        client = MagicMock()
+        client.get_activity.return_value = SimpleNamespace(
+            id=1234,
+            name="Indoor Run",
+            start_date_local=activity_start,
+            distance=5000.0,
+            moving_time=1800,
+            elapsed_time=1800,
+            total_elevation_gain=0.0,
+            average_heartrate=150.0,
+            max_heartrate=170,
+            average_speed=2.8,
+            max_speed=3.4,
+            average_watts=None,
+            max_watts=None,
+            kilojoules=None,
+        )
+        client.get_activity_streams.return_value = {
+            "time": SimpleNamespace(data=[0, 1, 2]),
+            "velocity_smooth": SimpleNamespace(data=[2.8, 0.8, 3.0]),
+            "moving": SimpleNamespace(data=None),
+        }
+
+        fetcher = LiveDataFetcher(data_paths=data_paths)
+        fetcher.latest_activity_id = 1234
+
+        summary_df, stream_df = fetcher._process_latest_activity_id(client)
+
+        assert summary_df["average_watts"].item() is None
+        assert summary_df["max_watts"].item() is None
+        assert summary_df["kilojoules"].item() is None
+        assert stream_df["power"].to_list() == [None, None, None]
+        assert stream_df["heartrate"].to_list() == [None, None, None]
+        assert stream_df["moving"].to_list() == [None, None, None]
+        assert stream_df["velocity"].to_list() == [2.8, 0.8, 3.0]
+
+        pace_values = stream_df["pace"].to_list()
+        assert pace_values[0] == pytest.approx((1000 / 2.8) / 60)
+        assert pace_values[1] is None
+        assert pace_values[2] == pytest.approx((1000 / 3.0) / 60)
+
+        assert fetcher.latest_activity_start_datetime == activity_start
+        assert fetcher.latest_activity_end_datetime == activity_start + timedelta(seconds=1800)
+
+    def test_process_latest_activity_id_returns_empty_streams_when_time_is_missing(
+        self, *, data_paths: DataPaths
+    ) -> None:
+        activity_start = datetime(2026, 3, 10, 18, 0, 0)
+        client = MagicMock()
+        client.get_activity.return_value = SimpleNamespace(
+            id=1234,
+            name="Indoor Run",
+            start_date_local=activity_start,
+            distance=5000.0,
+            moving_time=1800,
+            elapsed_time=1800,
+            total_elevation_gain=0.0,
+            average_heartrate=150.0,
+            max_heartrate=170,
+            average_speed=2.8,
+            max_speed=3.4,
+            average_watts=None,
+            max_watts=None,
+            kilojoules=None,
+        )
+        client.get_activity_streams.return_value = {
+            "watts": SimpleNamespace(data=[200.0, 205.0]),
+        }
+
+        fetcher = LiveDataFetcher(data_paths=data_paths)
+        fetcher.latest_activity_id = 1234
+
+        summary_df, stream_df = fetcher._process_latest_activity_id(client)
+
+        assert summary_df.height == 1
+        assert stream_df.is_empty()
+        assert dict(stream_df.schema) == {
+            "datetime": pl.Datetime,
+            "heartrate": pl.Int64,
+            "power": pl.Float64,
+            "velocity": pl.Float64,
+            "moving": pl.Boolean,
+            "activity_id": pl.Int64,
+            "pace": pl.Float64,
+        }
+
+    def test_fetch_latest_data_and_save_persists_null_power_metrics(self, *, data_paths: DataPaths) -> None:
+        activity_start = datetime(2026, 3, 10, 18, 0, 0)
+        fetcher = LiveDataFetcher(data_paths=data_paths)
+        summary_df = pl.DataFrame(
+            {
+                "activity_id": [1234],
+                "name": ["Indoor Run"],
+                "start_date_local": [activity_start],
+                "distance": [5000.0],
+                "moving_time": [1800],
+                "elapsed_time": [1800],
+                "total_elevation_gain": [0.0],
+                "average_heartrate": [150.0],
+                "max_heartrate": [170],
+                "average_speed": [2.8],
+                "max_speed": [3.4],
+                "average_watts": [None],
+                "max_watts": [None],
+                "kilojoules": [None],
+                "average_pace": [(1000 / 2.8) / 60],
+                "max_pace": [(1000 / 3.4) / 60],
+            }
+        ).with_columns(
+            pl.col("activity_id").cast(pl.Int64),
+            pl.col("start_date_local").cast(pl.Datetime),
+            pl.col("distance").cast(pl.Float64),
+            pl.col("moving_time").cast(pl.Int64),
+            pl.col("elapsed_time").cast(pl.Int64),
+            pl.col("total_elevation_gain").cast(pl.Float64),
+            pl.col("average_heartrate").cast(pl.Float64),
+            pl.col("max_heartrate").cast(pl.Int64),
+            pl.col("average_speed").cast(pl.Float64),
+            pl.col("max_speed").cast(pl.Float64),
+            pl.col("average_watts").cast(pl.Float64),
+            pl.col("max_watts").cast(pl.Int64),
+            pl.col("kilojoules").cast(pl.Float64),
+            pl.col("average_pace").cast(pl.Float64),
+            pl.col("max_pace").cast(pl.Float64),
+        )
+        stream_df = pl.DataFrame(
+            {
+                "datetime": [activity_start],
+                "heartrate": [150],
+                "power": [None],
+                "velocity": [2.8],
+                "moving": [None],
+                "activity_id": [1234],
+                "pace": [(1000 / 2.8) / 60],
+            }
+        ).with_columns(
+            pl.col("datetime").cast(pl.Datetime),
+            pl.col("heartrate").cast(pl.Int64),
+            pl.col("power").cast(pl.Float64),
+            pl.col("velocity").cast(pl.Float64),
+            pl.col("moving").cast(pl.Boolean),
+            pl.col("activity_id").cast(pl.Int64),
+            pl.col("pace").cast(pl.Float64),
+        )
+        carelink_df = pl.DataFrame(
+            {
+                "datetime": [activity_start],
+                "type": ["CGM"],
+                "value": [145.0],
+                "activity_id": [1234],
+            }
+        ).with_columns(
+            pl.col("datetime").cast(pl.Datetime),
+            pl.col("value").cast(pl.Float64),
+            pl.col("activity_id").cast(pl.Int64),
+        )
+
+        with (
+            patch.object(fetcher, "_get_strava_data", return_value=(summary_df, stream_df)),
+            patch.object(fetcher, "_get_carelink_data", return_value=carelink_df),
+        ):
+            result = fetcher.fetch_latest_data_and_save()
+
+        assert result is True
+
+        written_summary = pl.read_delta(str(data_paths.strava_summary))
+        written_stream = pl.read_delta(str(data_paths.strava_stream))
+        assert written_summary["average_watts"].item() is None
+        assert written_summary["max_watts"].item() is None
+        assert written_summary["kilojoules"].item() is None
+        assert written_stream["power"].item() is None
+        assert written_stream["moving"].item() is None

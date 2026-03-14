@@ -1,4 +1,4 @@
-from datetime import datetime
+import datetime
 
 from pandera.polars import DataFrameModel, Field
 from pandera.typing import Series
@@ -9,24 +9,24 @@ from dia_run.data_models.run_types import RunType
 class StravaSummarySchema(DataFrameModel):
     activity_id: Series[int] = Field(unique=True)
     name: Series[str]
-    start_date_local: Series[datetime]
+    start_date_local: Series[datetime.datetime]
     distance: Series[float] = Field(ge=0)
     moving_time: Series[int] = Field(ge=0)
     elapsed_time: Series[int] = Field(ge=0)
     total_elevation_gain: Series[float] = Field(ge=0)
-    average_heartrate: Series[float] = Field(ge=0)
-    max_heartrate: Series[int] = Field(ge=0)
+    average_heartrate: Series[float] = Field(nullable=True, ge=0)
+    max_heartrate: Series[int] = Field(nullable=True, ge=0)
     average_speed: Series[float] = Field(ge=0)
     max_speed: Series[float] = Field(ge=0)
-    average_watts: Series[float] = Field(ge=0)
-    max_watts: Series[int] = Field(ge=0)
-    kilojoules: Series[float] = Field(ge=0)
+    average_watts: Series[float] = Field(nullable=True, ge=0)
+    max_watts: Series[int] = Field(nullable=True, ge=0)
+    kilojoules: Series[float] = Field(nullable=True, ge=0)
     average_pace: Series[float] = Field(ge=0)
     max_pace: Series[float] = Field(ge=0)
     human_readable_time: Series[str]
     human_readable_pace: Series[str]
     distance_in_km: Series[str]
-    end_date_local: Series[datetime]
+    end_date_local: Series[datetime.datetime]
     name_date: Series[str]
     date: Series[str]
     run_type: Series[str] = Field(isin=[rt.value for rt in RunType])
@@ -40,7 +40,7 @@ class SummarySchema(StravaSummarySchema):
 
 
 class SpecificCarelinkSchema(DataFrameModel):
-    datetime: Series[datetime]
+    datetime: Series[datetime.datetime]
     type: Series[str] = Field(
         isin=[
             "CGM",
@@ -56,7 +56,7 @@ class SpecificCarelinkSchema(DataFrameModel):
 
 
 class StreamsSchema(DataFrameModel):
-    datetime: Series[datetime]
+    datetime: Series[datetime.datetime]
     run_type: Series[str] = Field(isin=[rt.value for rt in RunType])
 
 
@@ -86,8 +86,8 @@ class AggregateInsulinOnBoard(DataFrameModel):
 
 class PreRunInsulinSchema(DataFrameModel):
     activity_id: Series[int] = Field(unique=True)
-    datetime: Series[datetime]
-    start_date_local: Series[datetime]
+    datetime: Series[datetime.datetime]
+    start_date_local: Series[datetime.datetime]
     value: Series[float] = Field(ge=0)
 
 
