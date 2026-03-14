@@ -1,3 +1,9 @@
+## v0.26.0 (2026-03-14)
+
+### Feat
+
+- **TG-42**: abort stale CareLink fetches before saving (#58)
+
 ## v0.25.0 (2026-03-13)
 
 ### Feat
