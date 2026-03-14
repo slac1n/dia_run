@@ -1,3 +1,9 @@
+## v0.26.1 (2026-03-14)
+
+### Fix
+
+- tolerate missing Strava metrics for indoor runs
+
 ## v0.26.0 (2026-03-14)
 
 ### Feat
