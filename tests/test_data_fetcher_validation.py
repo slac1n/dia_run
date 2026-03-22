@@ -58,6 +58,19 @@ class TestCareLinkResponse:
         assert response.patientData.sgs[0].sg is None
         assert response.patientData.sgs[1].sg == 145.0
 
+    def test_accepts_calibration_marker_type(self) -> None:
+        activity_start = datetime(2026, 3, 10, 18, 0, 0)
+        payload = _build_carelink_payload(
+            sgs=[
+                (activity_start + timedelta(minutes=1), 145),
+            ],
+            markers=[_build_marker(timestamp=activity_start, marker_type="CALIBRATION")],
+        )
+
+        response = CareLinkResponse(**payload)
+
+        assert response.patientData.markers[0].type == "CALIBRATION"
+
 
 class TestLiveDataFetcherCareLink:
     @pytest.fixture
@@ -101,6 +114,39 @@ class TestLiveDataFetcherCareLink:
         assert df is not None
         cgm_df = df.filter(pl.col("type") == "CGM").sort("datetime")
         assert cgm_df["value"].to_list() == [None, 145.0]
+
+    def test_get_carelink_data_keeps_calibration_markers_with_null_value(self, *, data_paths: DataPaths) -> None:
+        activity_start = datetime(2026, 3, 10, 18, 0, 0)
+        payload = _build_carelink_payload(
+            sgs=[
+                (activity_start + timedelta(minutes=1), 140),
+            ],
+            markers=[_build_marker(timestamp=activity_start, marker_type="CALIBRATION")],
+        )
+        mock_client = MagicMock()
+        mock_client.init.return_value = True
+        mock_client.getRecentData.return_value = payload
+
+        with (
+            patch("dia_run.data_fetcher.live_fetcher.CareLinkClient", return_value=mock_client),
+            patch.object(
+                LiveDataFetcher,
+                "_get_current_server_time",
+                return_value=activity_start + timedelta(minutes=5),
+            ),
+        ):
+            fetcher = LiveDataFetcher(data_paths=data_paths)
+            fetcher.latest_activity_id = 1234
+            fetcher.activity_id_list = []
+            fetcher.latest_activity_start_datetime = activity_start
+            fetcher.latest_activity_end_datetime = activity_start + timedelta(minutes=30)
+
+            df = fetcher._get_carelink_data()
+
+        assert df is not None
+        calibration_df = df.filter(pl.col("type") == "CALIBRATION")
+        assert calibration_df.height == 1
+        assert calibration_df["value"].item() is None
 
     def test_get_carelink_data_filters_rows_to_configured_workout_window(self, *, data_paths: DataPaths) -> None:
         activity_start = datetime(2026, 3, 10, 18, 0, 0)

@@ -50,6 +50,7 @@ class SpecificCarelinkSchema(DataFrameModel):
             "MEAL",
             "LOW_GLUCOSE_SUSPENDED",
             "BG_READING",
+            "CALIBRATION",
         ]
     )
     value: Series[float] = Field(nullable=True, gt=0)
