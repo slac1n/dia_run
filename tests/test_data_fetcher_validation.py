@@ -8,7 +8,6 @@ import polars as pl
 import pytest
 
 import dia_run.data_fetcher.live_fetcher as live_fetcher_module
-from dia_run.data_fetcher.exceptions import CareLinkDataStaleError
 from dia_run.data_fetcher.live_fetcher import LiveDataFetcher
 from dia_run.data_models.api_responses import CareLinkResponse
 from dia_run.data_models.paths import DataPaths
@@ -254,7 +253,7 @@ class TestLiveDataFetcherCareLink:
         assert df is None
         mock_client_cls.assert_not_called()
 
-    def test_get_carelink_data_raises_when_latest_cgm_timestamp_is_stale(self, *, data_paths: DataPaths) -> None:
+    def test_get_carelink_data_continues_when_latest_cgm_timestamp_is_stale_hotfix(self, *, data_paths: DataPaths) -> None:
         activity_start = datetime(2026, 3, 10, 18, 0, 0)
         payload = _build_carelink_payload(
             sgs=[
@@ -283,8 +282,9 @@ class TestLiveDataFetcherCareLink:
             fetcher.latest_activity_start_datetime = activity_start
             fetcher.latest_activity_end_datetime = activity_start + timedelta(minutes=30)
 
-            with pytest.raises(CareLinkDataStaleError, match="CareLink data is out of date"):
-                fetcher._get_carelink_data()
+            df = fetcher._get_carelink_data()
+
+        assert df is not None
 
     def test_get_carelink_data_allows_latest_cgm_timestamp_at_threshold(self, *, data_paths: DataPaths) -> None:
         activity_start = datetime(2026, 3, 10, 18, 0, 0)
@@ -318,7 +318,7 @@ class TestLiveDataFetcherCareLink:
 
         assert df is not None
 
-    def test_get_carelink_data_uses_latest_cgm_timestamp_only_for_staleness(self, *, data_paths: DataPaths) -> None:
+    def test_get_carelink_data_uses_latest_cgm_timestamp_only_for_staleness_hotfix(self, *, data_paths: DataPaths) -> None:
         activity_start = datetime(2026, 3, 10, 18, 0, 0)
         payload = _build_carelink_payload(
             sgs=[
@@ -346,8 +346,9 @@ class TestLiveDataFetcherCareLink:
             fetcher.latest_activity_start_datetime = activity_start - timedelta(hours=1)
             fetcher.latest_activity_end_datetime = activity_start
 
-            with pytest.raises(CareLinkDataStaleError, match="CareLink data is out of date"):
-                fetcher._get_carelink_data()
+            df = fetcher._get_carelink_data()
+
+        assert df is not None
 
     def test_get_latest_cgm_timestamp_raises_when_sgs_is_empty(self, *, data_paths: DataPaths) -> None:
         activity_start = datetime(2026, 3, 10, 18, 0, 0)
@@ -402,7 +403,7 @@ class TestLiveDataFetcherCareLink:
         assert cgm_df.height == 1
         assert cgm_df["value"].to_list() == [145.0]
 
-    def test_fetch_latest_data_and_save_aborts_before_any_write_when_carelink_is_stale(
+    def test_fetch_latest_data_and_save_continues_and_writes_strava_when_carelink_is_stale_hotfix(
         self, *, data_paths: DataPaths
     ) -> None:
         fetcher = LiveDataFetcher(data_paths=data_paths)
@@ -438,19 +439,14 @@ class TestLiveDataFetcherCareLink:
             }
         )
 
-        with (
-            patch.object(fetcher, "_get_strava_data", return_value=(summary_df, stream_df)),
-            patch.object(
-                fetcher,
-                "_get_carelink_data",
-                side_effect=CareLinkDataStaleError("CareLink data is out of date. Please retry later."),
-            ),
+        with patch.object(fetcher, "_get_strava_data", return_value=(summary_df, stream_df)), patch.object(
+            fetcher, "_get_carelink_data", return_value=None
         ):
-            with pytest.raises(CareLinkDataStaleError):
-                fetcher.fetch_latest_data_and_save()
+            result = fetcher.fetch_latest_data_and_save()
 
-        assert not (data_paths.strava_summary / "_delta_log").exists()
-        assert not (data_paths.strava_stream / "_delta_log").exists()
+        assert result is True
+        assert (data_paths.strava_summary / "_delta_log").exists()
+        assert (data_paths.strava_stream / "_delta_log").exists()
         assert not (data_paths.carelink / "_delta_log").exists()
 
 
