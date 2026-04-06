@@ -253,7 +253,9 @@ class TestLiveDataFetcherCareLink:
         assert df is None
         mock_client_cls.assert_not_called()
 
-    def test_get_carelink_data_continues_when_latest_cgm_timestamp_is_stale_hotfix(self, *, data_paths: DataPaths) -> None:
+    def test_get_carelink_data_continues_when_latest_cgm_timestamp_is_stale_with_temporary_ignore(
+        self, *, data_paths: DataPaths
+    ) -> None:
         activity_start = datetime(2026, 3, 10, 18, 0, 0)
         payload = _build_carelink_payload(
             sgs=[
@@ -318,7 +320,9 @@ class TestLiveDataFetcherCareLink:
 
         assert df is not None
 
-    def test_get_carelink_data_uses_latest_cgm_timestamp_only_for_staleness_hotfix(self, *, data_paths: DataPaths) -> None:
+    def test_get_carelink_data_uses_latest_cgm_timestamp_only_for_staleness_with_temporary_ignore(
+        self, *, data_paths: DataPaths
+    ) -> None:
         activity_start = datetime(2026, 3, 10, 18, 0, 0)
         payload = _build_carelink_payload(
             sgs=[
@@ -403,7 +407,7 @@ class TestLiveDataFetcherCareLink:
         assert cgm_df.height == 1
         assert cgm_df["value"].to_list() == [145.0]
 
-    def test_fetch_latest_data_and_save_continues_and_writes_strava_when_carelink_is_stale_hotfix(
+    def test_fetch_latest_data_and_save_continues_and_writes_strava_when_carelink_is_stale_with_temporary_ignore(
         self, *, data_paths: DataPaths
     ) -> None:
         fetcher = LiveDataFetcher(data_paths=data_paths)

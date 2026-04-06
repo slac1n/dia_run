@@ -17,7 +17,7 @@ from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.schemas import SpecificCarelinkSchema
 from dia_run.settings import settings
 
-IGNORE_CARELINK_STALENESS = True
+TEMPORARY_IGNORE_CARELINK_STALENESS = True
 
 
 class LiveDataFetcher:
@@ -409,7 +409,7 @@ class LiveDataFetcher:
 
         if is_stale:
             # TODO: Remove this temporary hotfix and restore strict staleness enforcement once CareLink timestamp drift is fixed.
-            if IGNORE_CARELINK_STALENESS:
+            if TEMPORARY_IGNORE_CARELINK_STALENESS:
                 logger.warning(
                     "TEMPORARY HOTFIX: CareLink data is stale but fetch will continue "
                     "(latest_cgm_timestamp={} current_server_time={} age_minutes={})",
