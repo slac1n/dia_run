@@ -333,6 +333,8 @@ class LiveDataFetcher:
 
         carelink_rows: list[dict[str, datetime | float | int | None | str]] = []
         for reading in validated_carelink_data.patientData.sgs:
+            if reading.timestamp is None:
+                continue
             carelink_rows.append(
                 {
                     "datetime": self._parse_carelink_timestamp(raw_timestamp=reading.timestamp),
@@ -411,6 +413,8 @@ class LiveDataFetcher:
         latest_timestamp: datetime | None = None
 
         for reading in validated_carelink_data.patientData.sgs:
+            if reading.timestamp is None:
+                continue
             parsed_timestamp = self._parse_carelink_timestamp(raw_timestamp=reading.timestamp)
             if latest_timestamp is None or parsed_timestamp > latest_timestamp:
                 latest_timestamp = parsed_timestamp
