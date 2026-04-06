@@ -71,6 +71,18 @@ class TestCareLinkResponse:
 
         assert response.patientData.markers[0].type == "CALIBRATION"
 
+    def test_allows_sg_entry_without_timestamp(self) -> None:
+        payload: dict[str, Any] = {
+            "patientData": {
+                "sgs": [{"kind": "SG", "version": 1, "sg": 0}],
+                "markers": [],
+            }
+        }
+
+        response = CareLinkResponse(**payload)
+
+        assert response.patientData.sgs[0].timestamp is None
+
 
 class TestLiveDataFetcherCareLink:
     @pytest.fixture
@@ -353,6 +365,42 @@ class TestLiveDataFetcherCareLink:
 
             with pytest.raises(ValueError, match="CareLink API response did not include any CGM readings"):
                 fetcher._get_carelink_data()
+
+    def test_get_latest_cgm_timestamp_ignores_sgs_without_timestamp(self, *, data_paths: DataPaths) -> None:
+        activity_start = datetime(2026, 3, 10, 18, 0, 0)
+        payload: dict[str, Any] = {
+            "patientData": {
+                "sgs": [
+                    {"kind": "SG", "version": 1, "sg": 0},
+                    {"timestamp": _format_timestamp(value=activity_start + timedelta(minutes=2)), "sg": 145},
+                ],
+                "markers": [_build_marker(timestamp=activity_start)],
+            }
+        }
+        mock_client = MagicMock()
+        mock_client.init.return_value = True
+        mock_client.getRecentData.return_value = payload
+
+        with (
+            patch("dia_run.data_fetcher.live_fetcher.CareLinkClient", return_value=mock_client),
+            patch.object(
+                LiveDataFetcher,
+                "_get_current_server_time",
+                return_value=activity_start + timedelta(minutes=5),
+            ),
+        ):
+            fetcher = LiveDataFetcher(data_paths=data_paths)
+            fetcher.latest_activity_id = 1234
+            fetcher.activity_id_list = []
+            fetcher.latest_activity_start_datetime = activity_start
+            fetcher.latest_activity_end_datetime = activity_start + timedelta(minutes=30)
+
+            df = fetcher._get_carelink_data()
+
+        assert df is not None
+        cgm_df = df.filter(pl.col("type") == "CGM").sort("datetime")
+        assert cgm_df.height == 1
+        assert cgm_df["value"].to_list() == [145.0]
 
     def test_fetch_latest_data_and_save_aborts_before_any_write_when_carelink_is_stale(
         self, *, data_paths: DataPaths

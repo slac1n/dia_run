@@ -38,7 +38,7 @@ class StravaStreamData(BaseModel):
 
 
 class CareLinkGlucoseReading(BaseModel):
-    timestamp: str
+    timestamp: str | None = None
     sg: float | None = Field(default=None, ge=0)
 
     @field_validator("sg")
