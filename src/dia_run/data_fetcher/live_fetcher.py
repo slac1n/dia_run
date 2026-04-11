@@ -17,6 +17,8 @@ from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.schemas import SpecificCarelinkSchema
 from dia_run.settings import settings
 
+TEMPORARY_IGNORE_CARELINK_STALENESS = True
+
 
 class LiveDataFetcher:
     """Fetches real data from Strava and CareLink APIs and writes to Delta Lake tables."""
@@ -406,6 +408,17 @@ class LiveDataFetcher:
         )
 
         if is_stale:
+            # TODO: Remove this temporary hotfix and restore strict staleness
+            # enforcement once CareLink timestamp drift is fixed.
+            if TEMPORARY_IGNORE_CARELINK_STALENESS:
+                logger.warning(
+                    "TEMPORARY HOTFIX: CareLink data is stale but fetch will continue "
+                    "(latest_cgm_timestamp={} current_server_time={} age_minutes={})",
+                    latest_cgm_timestamp.isoformat(),
+                    current_server_time.isoformat(),
+                    round(staleness_age.total_seconds() / 60, 2),
+                )
+                return
             raise CareLinkDataStaleError("CareLink data is out of date. Please retry later.")
 
     def _get_latest_cgm_timestamp(self, *, validated_carelink_data: CareLinkResponse) -> tuple[str, datetime]:
