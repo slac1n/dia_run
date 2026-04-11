@@ -1,3 +1,9 @@
+## v0.26.3 (2026-04-11)
+
+### Fix
+
+- allow CareLink SG entries without timestamp
+
 ## v0.26.2 (2026-03-22)
 
 ### Fix
