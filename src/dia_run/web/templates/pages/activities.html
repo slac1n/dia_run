@@ -22,6 +22,8 @@
             <th>Time</th>
             <th>Pace</th>
             <th>Avg HR</th>
+            <th>Avg Glucose</th>
+            <th>TIR</th>
             <th>Run Type</th>
           </tr>
         </thead>
@@ -39,6 +41,8 @@
             <td data-label="Time">{{ activity.time }}</td>
             <td data-label="Pace">{{ activity.pace }}</td>
             <td data-label="Avg HR">{{ activity.average_heartrate }}</td>
+            <td data-label="Avg Glucose">{{ activity.avg_glucose }}</td>
+            <td data-label="TIR">{{ activity.time_in_range }}</td>
             <td data-label="Run Type">{{ activity.run_type }}</td>
           </tr>
           {% endfor %}
