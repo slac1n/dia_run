@@ -85,6 +85,21 @@ def test_dashboard_route(*, client: TestClient) -> None:
     assert "Training and glucose overview" in response.text
 
 
+def test_activities_list_shows_glucose_columns(*, client: TestClient) -> None:
+    response = client.get("/activities")
+    assert response.status_code == 200
+    assert "Avg Glucose" in response.text
+    assert "TIR" in response.text
+    assert "mg/dL" in response.text
+
+
+def test_activity_detail_shows_glucose_tiles(*, client: TestClient) -> None:
+    response = client.get("/activities/1001")
+    assert response.status_code == 200
+    assert "Avg Glucose" in response.text
+    assert "TIR" in response.text
+
+
 def test_dashboard_route_uses_cached_overview_context(*, client: TestClient, web_data_paths: DataPaths) -> None:
     service = get_overview_page_service(data_paths=web_data_paths)
     service.invalidate()

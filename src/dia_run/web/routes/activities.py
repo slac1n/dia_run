@@ -25,6 +25,8 @@ def list_activities(
     activities: list[dict[str, str | int]] = []
     for row in df_sorted.iter_rows(named=True):
         average_heartrate = row.get("average_heartrate")
+        avg_sg = row.get("avg_sg")
+        tir_pct = row.get("tir_pct")
         activities.append(
             {
                 "activity_id": row["activity_id"],
@@ -34,6 +36,8 @@ def list_activities(
                 "time": row["human_readable_time"],
                 "pace": row["human_readable_pace"],
                 "average_heartrate": (f"{average_heartrate:.0f} bpm" if average_heartrate is not None else "N/A"),
+                "avg_glucose": f"{avg_sg:.0f} mg/dL" if avg_sg is not None else "\u2014",
+                "time_in_range": f"{tir_pct:.0f}%" if tir_pct is not None else "\u2014",
                 "run_type": str(row["run_type"]),
             }
         )
@@ -70,6 +74,8 @@ def activity_detail(
 
     row = activity_df.row(0, named=True)
     average_heartrate = row.get("average_heartrate")
+    avg_sg = row.get("avg_sg")
+    tir_pct = row.get("tir_pct")
 
     activity = {
         "activity_id": row["activity_id"],
@@ -79,6 +85,8 @@ def activity_detail(
         "time": row["human_readable_time"],
         "pace": row["human_readable_pace"],
         "average_heartrate": (f"{average_heartrate:.0f} bpm" if average_heartrate is not None else "N/A"),
+        "avg_glucose": f"{avg_sg:.0f} mg/dL" if avg_sg is not None else "\u2014",
+        "time_in_range": f"{tir_pct:.0f}%" if tir_pct is not None else "\u2014",
         "run_type": str(row["run_type"]),
     }
 

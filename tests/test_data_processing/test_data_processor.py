@@ -56,6 +56,12 @@ class TestDataProcessor:
         # Activity 1004: 6.17 min/km = 6:10 -> "6:10"
         assert result.filter(pl.col("activity_id") == 1004)["human_readable_pace"].item() == "6:10"
 
+        # Verify tir_pct is present and within valid range
+        assert "tir_pct" in result.columns
+        tir_values = result.drop_nulls("tir_pct")["tir_pct"]
+        assert (tir_values >= 0).all()
+        assert (tir_values <= 100).all()
+
     def test_get_summary_allows_missing_watts(self, *, test_data_paths: DataPaths, tmp_path: Path) -> None:
         indoor_root = tmp_path / "indoor_run_missing_watts"
         indoor_paths = DataPaths.from_root(root=indoor_root)
