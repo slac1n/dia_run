@@ -36,6 +36,7 @@ class SummarySchema(StravaSummarySchema):
     in_going_sg: Series[float] = Field(nullable=True, gt=0)
     out_going_sg: Series[float] = Field(nullable=True, gt=0)
     avg_sg: Series[float] = Field(nullable=True, gt=0)
+    tir_pct: Series[float] = Field(nullable=True, ge=0, le=100)
     insulin_on_board_in_going: Series[float] = Field(nullable=True, ge=0)
 
 
@@ -78,6 +79,7 @@ class AggregatedGlucoseSchema(DataFrameModel):
     avg_sg: Series[float] = Field(nullable=True, gt=0)
     in_going_sg: Series[float] = Field(nullable=True, gt=0)
     out_going_sg: Series[float] = Field(nullable=True, gt=0)
+    tir_pct: Series[float] = Field(nullable=True, ge=0, le=100)
 
 
 class AggregateInsulinOnBoard(DataFrameModel):

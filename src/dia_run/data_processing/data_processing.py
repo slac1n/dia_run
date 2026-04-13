@@ -560,6 +560,9 @@ class DataProcessor:
                         pl.col("value").first().alias("in_going_sg"),
                         pl.col("value").last().alias("out_going_sg"),
                         pl.col("value").mean().alias("avg_sg"),
+                        (pl.col("value").is_between(TARGET_GLUCOSE_LOWER, TARGET_GLUCOSE_UPPER).mean() * 100)
+                        .round(1)
+                        .alias("tir_pct"),
                     ]
                 )
             ),
