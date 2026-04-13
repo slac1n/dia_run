@@ -1,3 +1,9 @@
+## v0.27.0 (2026-04-13)
+
+### Feat
+
+- show avg glucose and TIR on activity detail and overview (TG-43)
+
 ## v0.26.3 (2026-04-11)
 
 ### Fix
