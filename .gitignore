@@ -31,3 +31,6 @@ logindata.json
 
 # runtime secrets
 secrets/
+
+# heartbeat debug artifacts
+tmp_carelink_raw.json
