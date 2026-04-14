@@ -27,7 +27,7 @@ The IAM user whose keys are in `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` nee
     {
       "Effect": "Allow",
       "Action": "ses:SendEmail",
-      "Resource": "arn:aws:ses:<region>:<account-id>:identity/<your-verified-address>"
+      "Resource": "*"
     }
   ]
 }
