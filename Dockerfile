@@ -10,9 +10,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 ARG SUPERCRONIC_VERSION=0.2.33
-ARG TARGETARCH
-RUN curl -fsSLo /usr/local/bin/supercronic \
-    "https://github.com/aptible/supercronic/releases/download/v${SUPERCRONIC_VERSION}/supercronic-linux-${TARGETARCH}" \
+RUN ARCH="$(dpkg --print-architecture)" \
+    && curl -fsSLo /usr/local/bin/supercronic \
+    "https://github.com/aptible/supercronic/releases/download/v${SUPERCRONIC_VERSION}/supercronic-linux-${ARCH}" \
     && chmod +x /usr/local/bin/supercronic
 
 RUN pip install --no-cache-dir uv
