@@ -2,7 +2,7 @@ services:
   cron:
     build:
       context: .
-    command: ["supercronic", "/app/scripts/crontab"]
+    command: ["supercronic", "-no-reap", "/app/scripts/crontab"]
     env_file:
       - .env.prod
     restart: always
