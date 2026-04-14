@@ -1,4 +1,16 @@
 services:
+  cron:
+    build:
+      context: .
+    command: ["supercronic", "-no-reap", "/app/scripts/crontab"]
+    env_file:
+      - .env.prod
+    restart: always
+    network_mode: host
+    volumes:
+      - ./data:/app/data
+      - ./secrets:/app/secrets
+
   web:
     build:
       context: .
