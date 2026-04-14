@@ -1,0 +1,3 @@
+# CareLink nightly heartbeat: keeps the token alive and validates the API schema.
+# Runs at 03:00 UTC = 04:00/05:00 Europe/Berlin depending on DST.
+0 3 * * * /app/.venv/bin/python /app/scripts/carelink_heartbeat.py

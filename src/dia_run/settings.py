@@ -23,6 +23,8 @@ class AppSettings(BaseSettings):
     s3_sync_after_fetch: bool = False
     s3_sync_after_questionnaire: bool = False
     aws_region: str | None = None
+    heartbeat_email_from: str | None = None
+    heartbeat_email_to: str | None = None
 
     @field_validator("s3_prefix")
     @classmethod

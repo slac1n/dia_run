@@ -1,3 +1,14 @@
+## v0.28.0 (2026-04-14)
+
+### Feat
+
+- add nightly CareLink heartbeat to keep token alive and alert on failures
+
+### Fix
+
+- resolve supercronic PID 1 crash by disabling process reaper
+- fix supercronic exec error and arch detection in crontab and Dockerfile
+
 ## v0.27.0 (2026-04-13)
 
 ### Feat
