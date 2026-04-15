@@ -1,3 +1,9 @@
+## v0.28.1 (2026-04-15)
+
+### Fix
+
+- disable SSL verification in vendored CareLink client
+
 ## v0.28.0 (2026-04-14)
 
 ### Feat
