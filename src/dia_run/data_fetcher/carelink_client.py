@@ -45,13 +45,19 @@
 # sso_config["server"]["hostname"]:sso_config["server"]["port"]/sso_config["server"]["prefix"]/sso_config["system_endpoints"]["token_endpoint_path"]
 # POST /auth/oauth/v2/token
 
-import json
-import requests
-import time
 import base64
-import os
+import json
 import logging as log
+import os
+import time
 from datetime import datetime, timedelta
+
+import requests
+import urllib3
+
+# Medtronic's SSL certificate on clcloud.minimed.eu has expired;
+# suppress the warning until they renew it.
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 # Version string
@@ -139,7 +145,7 @@ class CareLinkClient(object):
     ###########################################################
     def _get_config(self, discovery_url, country):
         log.info("_get_config()")
-        resp = requests.get(discovery_url)
+        resp = requests.get(discovery_url, verify=False)
         log.debug("   status: %d" % resp.status_code)
         data = resp.json()
         region = None
@@ -163,7 +169,7 @@ class CareLinkClient(object):
             raise Exception("ERROR: failed to get config base urls for region %s" % region)
 
         sso_configuration_key = config["UseSSOConfiguration"]
-        resp = requests.get(config[sso_configuration_key])
+        resp = requests.get(config[sso_configuration_key], verify=False)
         log.debug("   status: %d" % resp.status_code)
         sso_config = resp.json()
         sso_base_url = "https://%s:%d/%s" % (
@@ -188,7 +194,7 @@ class CareLinkClient(object):
             headers["mag-identifier"] = token_data["mag-identifier"]
         headers["Authorization"] = "Bearer " + token_data["access_token"]
         self.__last_api_status = None
-        resp = requests.get(url=url, headers=headers)
+        resp = requests.get(url=url, headers=headers, verify=False)
         self.__last_api_status = resp.status_code
         log.debug("   status: %d" % resp.status_code)
         try:
@@ -208,7 +214,7 @@ class CareLinkClient(object):
             headers["mag-identifier"] = token_data["mag-identifier"]
         headers["Authorization"] = "Bearer " + token_data["access_token"]
         self.__last_api_status = None
-        resp = requests.get(url=url, headers=headers)
+        resp = requests.get(url=url, headers=headers, verify=False)
         self.__last_api_status = resp.status_code
         log.debug("   status: %d" % resp.status_code)
         try:
@@ -239,7 +245,7 @@ class CareLinkClient(object):
         # log.debug("data: %s" % json.dumps(data))
 
         self.__last_api_status = None
-        resp = requests.post(url=url, headers=headers, data=json.dumps(data))
+        resp = requests.post(url=url, headers=headers, data=json.dumps(data), verify=False)
         self.__last_api_status = resp.status_code
         log.debug("   status: %d" % resp.status_code)
         try:
@@ -264,7 +270,7 @@ class CareLinkClient(object):
         headers = {}
         if "mag-identifier" in token_data:
             headers["mag-identifier"] = token_data["mag-identifier"]
-        resp = requests.post(url=token_url, headers=headers, data=data)
+        resp = requests.post(url=token_url, headers=headers, data=data, verify=False)
         log.debug("   status: %d" % resp.status_code)
         if resp.status_code != 200:
             raise Exception("ERROR: failed to refresh token")
