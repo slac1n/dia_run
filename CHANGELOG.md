@@ -1,3 +1,9 @@
+## v0.29.0 (2026-04-15)
+
+### Feat
+
+- overhaul dashboard UI layout and navigation
+
 ## v0.28.1 (2026-04-15)
 
 ### Fix
