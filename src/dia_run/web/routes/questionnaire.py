@@ -66,7 +66,7 @@ def questionnaire_list(
             }
         )
 
-    nav_items = [
+    page_links = [
         {"label": "Dashboard", "href": "/"},
         {"label": "Activities", "href": "/activities"},
         {"label": "Questionnaire", "href": "/questionnaire"},
@@ -107,7 +107,7 @@ def questionnaire_list(
         {
             "request": request,
             "title": "Questionnaire",
-            "nav_items": nav_items,
+            "page_links": page_links,
             "activities": activities,
             "activity_count": len(activities),
             "flash": flash,
@@ -147,7 +147,7 @@ def questionnaire_form(
     questionnaire_path = data_paths.questionnaire / f"{activity_id}.json"
     existing = questionnaire_path.exists()
 
-    nav_items = [
+    page_links = [
         {"label": "Dashboard", "href": "/"},
         {"label": "Activities", "href": "/activities"},
         {"label": "Questionnaire", "href": "/questionnaire"},
@@ -159,7 +159,7 @@ def questionnaire_form(
         {
             "request": request,
             "title": "Run Questionnaire",
-            "nav_items": nav_items,
+            "page_links": page_links,
             "activity": activity,
             "existing": existing,
             "errors": [],
@@ -284,7 +284,7 @@ async def submit_questionnaire(
         )
     except ValidationError as exc:
         errors = _format_validation_errors(errors=cast(Sequence[Mapping[str, object]], exc.errors()))
-        nav_items = [
+        page_links = [
             {"label": "Dashboard", "href": "/"},
             {"label": "Activities", "href": "/activities"},
             {"label": "Questionnaire", "href": "/questionnaire"},
@@ -295,7 +295,7 @@ async def submit_questionnaire(
             {
                 "request": request,
                 "title": "Run Questionnaire",
-                "nav_items": nav_items,
+                "page_links": page_links,
                 "activity": activity,
                 "existing": existing,
                 "errors": errors,

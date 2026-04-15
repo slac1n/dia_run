@@ -43,10 +43,15 @@ def dashboard(
 
     nav_items = [
         {"label": "Overview", "href": "#overview"},
-        {"label": "Activities", "href": "#activities"},
+        {"label": "Calendar", "href": "#activities"},
         {"label": "Run Types", "href": "#run-types"},
-        {"label": "Diabetes", "href": "#diabetes"},
-        {"label": "Fueling", "href": "#fueling"},
+        {"label": "Pre-run", "href": "#pre-run"},
+        {"label": "Mid-run", "href": "#mid-run"},
+        {"label": "Basal", "href": "#basal"},
+    ]
+
+    page_links = [
+        {"label": "Activities", "href": "/activities"},
     ]
 
     return templates.TemplateResponse(
@@ -57,6 +62,7 @@ def dashboard(
             "title": "Dia-Run Dashboard",
             "plotly_cdn": PLOTLY_CDN,
             "nav_items": nav_items,
+            "page_links": page_links,
             "kpi_cards": dashboard_context.kpi_cards,
             "flash": flash,
             "charts": dashboard_context.charts,

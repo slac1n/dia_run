@@ -17,12 +17,7 @@
       <p class="eyebrow">Last 30 days</p>
       <h1>Training and glucose overview</h1>
     </div>
-    <div class="section-actions">
-      <p class="section-note">Generated from your latest Strava and CareLink data.</p>
-      <form class="inline-form" action="/fetch" method="post">
-        <button class="button" type="submit">Download new data</button>
-      </form>
-    </div>
+    <p class="section-note">Generated from your latest Strava and CareLink data.</p>
   </div>
   <div class="kpi-grid">
     {% for card in kpi_cards %}
@@ -40,7 +35,7 @@
       <p class="eyebrow">Activities</p>
       <h2>Distance calendar</h2>
     </div>
-    <p class="section-note">Year-to-date running volume by day. <a class="inline-link" href="/activities">View activity list</a>.</p>
+    <p class="section-note">Year-to-date running volume by day.</p>
   </div>
   <div class="chart-grid">
     <div class="chart-card chart-card--full chart-card--calendar">
@@ -77,11 +72,11 @@
   </div>
 </section>
 
-<section id="diabetes" class="section">
+<section id="pre-run" class="section">
   <div class="section-header">
     <div>
-      <p class="eyebrow">Diabetes insights</p>
-      <h2>Glucose dynamics around running</h2>
+      <p class="eyebrow">Pre-run</p>
+      <h2>Insulin and nutrition before the run</h2>
     </div>
     <p class="section-note">Understand insulin on board, pre-run fueling, and glucose shifts.</p>
   </div>
@@ -113,13 +108,13 @@
   </div>
 </section>
 
-<section id="fueling" class="section">
+<section id="mid-run" class="section">
   <div class="section-header">
     <div>
-      <p class="eyebrow">Fueling impact</p>
-      <h2>Glucose response to mid-run carbs and basal adjustments</h2>
+      <p class="eyebrow">Mid-run</p>
+      <h2>Glucose response to fueling</h2>
     </div>
-    <p class="section-note">Measure glucose response and peak increases after fueling, and time in range during basal adjustments.</p>
+    <p class="section-note">Measure glucose response and peak increases after mid-run carbs.</p>
   </div>
   <div class="chart-grid">
     <div class="chart-card">
@@ -130,6 +125,18 @@
       <h3>Carbs vs peak increase</h3>
       <div class="chart-embed" data-plot-kind="fueling_carbs_peak">{{ charts.fueling_carbs_peak }}</div>
     </div>
+  </div>
+</section>
+
+<section id="basal" class="section">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Basal</p>
+      <h2>Time in range during basal adjustments</h2>
+    </div>
+    <p class="section-note">Track glucose stability when basal rates are temporarily adjusted.</p>
+  </div>
+  <div class="chart-grid">
     <div class="chart-card chart-card--full">
       <h3>Time in range during basal adjustments</h3>
       <div class="chart-embed" data-plot-kind="basal_adjustment_tir">{{ charts.basal_adjustment_tir }}</div>
