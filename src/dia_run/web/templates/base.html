@@ -10,7 +10,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Work+Sans:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}?v=8" />
+    <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}?v=9" />
     {% if plotly_cdn %}
     <script src="{{ plotly_cdn }}"></script>
     {% endif %}
@@ -20,15 +20,24 @@
       <div class="container header-inner">
         <div class="brand-group">
           <a class="brand" href="/">Dia-Run</a>
-          <span class="badge">FastAPI dashboard</span>
         </div>
-        {% if nav_items %}
         <nav class="site-nav">
+          {% if nav_items %}
           {% for item in nav_items %}
           <a href="{{ item.href }}">{{ item.label }}</a>
           {% endfor %}
+          {% endif %}
+          <div class="nav-actions">
+            {% if page_links %}
+            {% for link in page_links %}
+            <a href="{{ link.href }}" class="button button-outline button--nav">{{ link.label }}</a>
+            {% endfor %}
+            {% endif %}
+            <form class="nav-fetch-form" action="/fetch" method="post">
+              <button class="button button--nav" type="submit">Download new data</button>
+            </form>
+          </div>
         </nav>
-        {% endif %}
       </div>
     </header>
     <main class="container">
@@ -36,7 +45,7 @@
     </main>
     <footer class="site-footer">
       <div class="container footer-inner">
-        <span>Data lives in ./data and stays local.</span>
+        <span>Do Hard Things.</span>
         <span>{{ app_version }}</span>
       </div>
     </footer>

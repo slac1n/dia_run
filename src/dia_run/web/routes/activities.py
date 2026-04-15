@@ -42,9 +42,8 @@ def list_activities(
             }
         )
 
-    nav_items = [
+    page_links = [
         {"label": "Dashboard", "href": "/"},
-        {"label": "Activities", "href": "/activities"},
     ]
 
     return templates.TemplateResponse(
@@ -53,7 +52,7 @@ def list_activities(
         {
             "request": request,
             "title": "Activities",
-            "nav_items": nav_items,
+            "page_links": page_links,
             "activities": activities,
             "activity_count": len(activities),
         },
@@ -116,7 +115,7 @@ def activity_detail(
         for entry in questionnaire.fueling_during_run
     ]
 
-    nav_items = [
+    page_links = [
         {"label": "Dashboard", "href": "/"},
         {"label": "Activities", "href": "/activities"},
     ]
@@ -128,7 +127,7 @@ def activity_detail(
             "request": request,
             "title": f"Activity {activity['activity_id']}",
             "plotly_cdn": PLOTLY_CDN,
-            "nav_items": nav_items,
+            "page_links": page_links,
             "activity": activity,
             "chart": chart,
             "pre_run": pre_run,
