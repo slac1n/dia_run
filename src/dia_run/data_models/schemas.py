@@ -131,3 +131,51 @@ class FuelingImpactSchema(DataFrameModel):
     peak_increase: Series[float] = Field(nullable=True)
     time_to_peak_min: Series[float] = Field(nullable=True)
     name_date: Series[str]
+
+
+TIME_OF_DAY_BUCKETS = ["before_noon", "after_noon"]
+DURATION_BANDS = ["<=45", "46-75", "76-120", ">120"]
+GLUCOSE_BANDS = ["<100", "100-129", "130-159", "160-180", ">180"]
+BASAL_LEAD_TIME_BUCKETS = ["none", "0-15", "16-30", "31-60", ">60"]
+PATTERN_AGGREGATE_DIMS = ["time_of_day", "stability", "basal_lead_time", "sg20", "cohort"]
+
+
+class PatternFeaturesSchema(DataFrameModel):
+    activity_id: Series[int] = Field(unique=True)
+    name_date: Series[str]
+    start_date_local: Series[datetime.datetime]
+    run_type: Series[str] = Field(isin=[rt.value for rt in RunType])
+    tir_pct: Series[float] = Field(nullable=True, ge=0, le=100)
+    out_going_sg: Series[float] = Field(nullable=True, gt=0)
+    good_finish_flag: Series[bool] = Field(nullable=True)
+    low_event_flag: Series[bool] = Field(nullable=True)
+    run_variability_p90_p10: Series[float] = Field(nullable=True, ge=0)
+    sg_start: Series[float] = Field(nullable=True, gt=0)
+    sg_20: Series[float] = Field(nullable=True, gt=0)
+    early_delta_20: Series[float] = Field(nullable=True)
+    early_in_range_flag: Series[bool] = Field(nullable=True)
+    stable_20_flag: Series[bool] = Field(nullable=True)
+    early_span_20: Series[float] = Field(nullable=True, ge=0)
+    time_of_day_bucket: Series[str] = Field(isin=TIME_OF_DAY_BUCKETS)
+    duration_band: Series[str] = Field(isin=DURATION_BANDS)
+    start_glucose_band: Series[str] = Field(nullable=True, isin=GLUCOSE_BANDS)
+    sg_20_bin: Series[str] = Field(nullable=True, isin=GLUCOSE_BANDS)
+    basal_lead_time_min: Series[int] = Field(nullable=True, ge=0)
+    basal_lead_time_bucket: Series[str] = Field(isin=BASAL_LEAD_TIME_BUCKETS)
+    insulin_on_board_in_going: Series[float] = Field(nullable=True, ge=0)
+    total_carbohydrates_g: Series[int] = Field(nullable=True, gt=0)
+    earliest_time_before_start_min: Series[int] = Field(nullable=True, le=0)
+    avg_bolus_percentage: Series[float] = Field(nullable=True, ge=0)
+
+
+class PatternAggregateSchema(DataFrameModel):
+    bucket_key: Series[str]
+    bucket_dim: Series[str] = Field(isin=PATTERN_AGGREGATE_DIMS)
+    n: Series[int] = Field(ge=0)
+    tir_median: Series[float] = Field(nullable=True, ge=0, le=100)
+    tir_mean: Series[float] = Field(nullable=True, ge=0, le=100)
+    low_event_rate: Series[float] = Field(nullable=True, ge=0, le=1)
+    good_finish_rate: Series[float] = Field(nullable=True, ge=0, le=1)
+    stable_20_rate: Series[float] = Field(nullable=True, ge=0, le=1)
+    variability_median: Series[float] = Field(nullable=True, ge=0)
+    actionable: Series[bool]

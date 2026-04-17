@@ -20,6 +20,7 @@ from dia_run.data_models.schemas import (
     FuelingImpactSchema,
     GlucoseStreamsSchema,
     HeartrateStreamsSchema,
+    PatternFeaturesSchema,
     PreRunInsulinSchema,
     PreRunNutritionSummarySchema,
     SpecificCarelinkSchema,
@@ -49,6 +50,79 @@ INTERVAL_KEYWORD = RunType.get_keyword(RunType.INTERVAL) or ""
 TEMPO_KEYWORD = RunType.get_keyword(RunType.TEMPO) or ""
 LONG_KEYWORD = RunType.get_keyword(RunType.LONG) or ""
 
+SG_TOLERANCE_MINUTES: float = 7.5
+EARLY_WINDOW_MINUTES: int = 20
+STABLE_DELTA_LIMIT: int = 20
+
+
+def _compute_duration_band(moving_time_sec: int) -> str:
+    if moving_time_sec <= 45 * 60:
+        return "<=45"
+    if moving_time_sec <= 75 * 60:
+        return "46-75"
+    if moving_time_sec <= 120 * 60:
+        return "76-120"
+    return ">120"
+
+
+def _compute_glucose_band(value: float | None) -> str | None:
+    if value is None:
+        return None
+    if value < 100:
+        return "<100"
+    if value <= 129:
+        return "100-129"
+    if value <= 159:
+        return "130-159"
+    if value <= 180:
+        return "160-180"
+    return ">180"
+
+
+def _compute_basal_lead_time(questionnaire: QuestionnaireModel | None) -> tuple[int | None, str]:
+    if questionnaire is None or not questionnaire.basal_adjustments:
+        return None, "none"
+    pre_run_starts = [adj.start_time_min for adj in questionnaire.basal_adjustments if adj.start_time_min < 0]
+    if not pre_run_starts:
+        return None, "none"
+    lead_time = -min(pre_run_starts)
+    if lead_time <= 15:
+        return lead_time, "0-15"
+    if lead_time <= 30:
+        return lead_time, "16-30"
+    if lead_time <= 60:
+        return lead_time, "31-60"
+    return lead_time, ">60"
+
+
+_PATTERN_FEATURES_SCHEMA: dict[str, pl.DataType] = {
+    "activity_id": pl.Int64,
+    "name_date": pl.Utf8,
+    "start_date_local": pl.Datetime,
+    "run_type": pl.Utf8,
+    "tir_pct": pl.Float64,
+    "out_going_sg": pl.Float64,
+    "good_finish_flag": pl.Boolean,
+    "low_event_flag": pl.Boolean,
+    "run_variability_p90_p10": pl.Float64,
+    "sg_start": pl.Float64,
+    "sg_20": pl.Float64,
+    "early_delta_20": pl.Float64,
+    "early_in_range_flag": pl.Boolean,
+    "stable_20_flag": pl.Boolean,
+    "early_span_20": pl.Float64,
+    "time_of_day_bucket": pl.Utf8,
+    "duration_band": pl.Utf8,
+    "start_glucose_band": pl.Utf8,
+    "sg_20_bin": pl.Utf8,
+    "basal_lead_time_min": pl.Int64,
+    "basal_lead_time_bucket": pl.Utf8,
+    "insulin_on_board_in_going": pl.Float64,
+    "total_carbohydrates_g": pl.Int64,
+    "earliest_time_before_start_min": pl.Int64,
+    "avg_bolus_percentage": pl.Float64,
+}
+
 
 class DataProcessor:
     def __init__(self, data_paths: DataPaths | None = None) -> None:
@@ -60,6 +134,7 @@ class DataProcessor:
         self.df_fueling_glucose_windows: pl.DataFrame | None = None
         self.df_fueling_impact: pl.DataFrame | None = None
         self.df_basal_adjustment_tir: pl.DataFrame | None = None
+        self.df_pattern_features: pl.DataFrame | None = None
         self.df_cgm: pl.DataFrame | None = None
         self._cgm_by_activity: dict[int, pl.DataFrame] | None = None
         self._questionnaire_cache: dict[int, QuestionnaireModel] | None = None
@@ -489,6 +564,144 @@ class DataProcessor:
             }
         )
         return _typed(self.df_basal_adjustment_tir)
+
+    @check_types
+    def get_pattern_features(self) -> DataFrame[PatternFeaturesSchema]:
+        if self.df_pattern_features is not None:
+            return _typed(self.df_pattern_features)
+
+        df_summary = cast(pl.DataFrame, self.get_summary())
+        df_nutrition = cast(pl.DataFrame, self.get_pre_run_nutrition_summary())
+        questionnaires = self._get_questionnaire_cache()
+        cgm_by_activity = self._get_cgm_by_activity()
+
+        nutrition_by_id: dict[int, dict[str, Any]] = {
+            int(row["activity_id"]): row for row in df_nutrition.iter_rows(named=True)
+        }
+
+        feature_rows: list[dict[str, Any]] = []
+        for row in df_summary.iter_rows(named=True):
+            activity_id = int(row["activity_id"])
+            start_date_local: datetime = row["start_date_local"]
+            end_date_local: datetime = row["end_date_local"]
+            out_going_sg = row["out_going_sg"]
+
+            df_cgm = cgm_by_activity.get(activity_id)
+
+            sg_start = self._nearest_cgm_value(df_cgm, target_dt=start_date_local, tolerance_min=SG_TOLERANCE_MINUTES)
+            sg_20 = self._nearest_cgm_value(
+                df_cgm,
+                target_dt=start_date_local + timedelta(minutes=EARLY_WINDOW_MINUTES),
+                tolerance_min=SG_TOLERANCE_MINUTES,
+            )
+            early_delta_20 = sg_20 - sg_start if (sg_start is not None and sg_20 is not None) else None
+
+            low_event_flag: bool | None = None
+            run_variability_p90_p10: float | None = None
+            early_in_range_flag: bool | None = None
+            early_span_20: float | None = None
+
+            if df_cgm is not None and not df_cgm.is_empty():
+                df_valid = df_cgm.drop_nulls("value")
+                if not df_valid.is_empty():
+                    df_in_run = df_valid.filter(
+                        (pl.col("datetime") >= start_date_local) & (pl.col("datetime") <= end_date_local)
+                    )
+                    if not df_in_run.is_empty():
+                        in_run_values = df_in_run["value"]
+                        low_event_flag = bool((in_run_values < TARGET_GLUCOSE_LOWER).any())
+                        p90 = in_run_values.quantile(0.9)
+                        p10 = in_run_values.quantile(0.1)
+                        if p90 is not None and p10 is not None:
+                            run_variability_p90_p10 = round(float(p90) - float(p10), 1)
+
+                    df_early = df_valid.filter(
+                        (pl.col("datetime") >= start_date_local)
+                        & (pl.col("datetime") <= start_date_local + timedelta(minutes=EARLY_WINDOW_MINUTES))
+                    )
+                    if not df_early.is_empty():
+                        early_values = df_early["value"]
+                        early_in_range_flag = bool(
+                            (early_values >= TARGET_GLUCOSE_LOWER).all()
+                            and (early_values <= TARGET_GLUCOSE_UPPER).all()
+                        )
+                        early_span_20 = round(float(early_values.max()) - float(early_values.min()), 1)  # type: ignore[arg-type]
+
+            stable_20_flag: bool | None
+            if (
+                early_in_range_flag is not None
+                and sg_start is not None
+                and sg_20 is not None
+                and early_delta_20 is not None
+            ):
+                stable_20_flag = bool(early_in_range_flag and abs(early_delta_20) <= STABLE_DELTA_LIMIT)
+            else:
+                stable_20_flag = None
+
+            good_finish_flag: bool | None = (
+                bool(TARGET_GLUCOSE_LOWER <= out_going_sg <= TARGET_GLUCOSE_UPPER) if out_going_sg is not None else None
+            )
+
+            time_of_day_bucket = "before_noon" if start_date_local.hour < 12 else "after_noon"
+            duration_band = _compute_duration_band(int(row["moving_time"]))
+            start_glucose_band = _compute_glucose_band(sg_start)
+            sg_20_bin = _compute_glucose_band(sg_20)
+
+            basal_lead_time_min, basal_lead_time_bucket = _compute_basal_lead_time(questionnaires.get(activity_id))
+
+            nutrition = nutrition_by_id.get(activity_id)
+
+            feature_rows.append(
+                {
+                    "activity_id": activity_id,
+                    "name_date": row["name_date"],
+                    "start_date_local": start_date_local,
+                    "run_type": row["run_type"],
+                    "tir_pct": row["tir_pct"],
+                    "out_going_sg": out_going_sg,
+                    "good_finish_flag": good_finish_flag,
+                    "low_event_flag": low_event_flag,
+                    "run_variability_p90_p10": run_variability_p90_p10,
+                    "sg_start": sg_start,
+                    "sg_20": sg_20,
+                    "early_delta_20": round(early_delta_20, 1) if early_delta_20 is not None else None,
+                    "early_in_range_flag": early_in_range_flag,
+                    "stable_20_flag": stable_20_flag,
+                    "early_span_20": early_span_20,
+                    "time_of_day_bucket": time_of_day_bucket,
+                    "duration_band": duration_band,
+                    "start_glucose_band": start_glucose_band,
+                    "sg_20_bin": sg_20_bin,
+                    "basal_lead_time_min": basal_lead_time_min,
+                    "basal_lead_time_bucket": basal_lead_time_bucket,
+                    "insulin_on_board_in_going": row["insulin_on_board_in_going"],
+                    "total_carbohydrates_g": nutrition["total_carbohydrates_g"] if nutrition else None,
+                    "earliest_time_before_start_min": nutrition["earliest_time_before_start_min"]
+                    if nutrition
+                    else None,
+                    "avg_bolus_percentage": nutrition["avg_bolus_percentage"] if nutrition else None,
+                }
+            )
+
+        self.df_pattern_features = pl.DataFrame(feature_rows or [], schema=_PATTERN_FEATURES_SCHEMA)
+        return _typed(self.df_pattern_features)
+
+    def _nearest_cgm_value(
+        self, df_cgm: pl.DataFrame | None, *, target_dt: datetime, tolerance_min: float
+    ) -> float | None:
+        if df_cgm is None or df_cgm.is_empty():
+            return None
+        df_valid = df_cgm.drop_nulls("value")
+        if df_valid.is_empty():
+            return None
+        df_valid = df_valid.with_columns(
+            (pl.col("datetime") - target_dt).dt.total_seconds().abs().alias("_time_diff_sec")
+        )
+        nearest = df_valid.sort("_time_diff_sec").head(1)
+        time_diff_sec = float(nearest["_time_diff_sec"].item())
+        if time_diff_sec / 60.0 > tolerance_min:
+            return None
+        return float(nearest["value"].item())
 
     def _get_baseline_glucose(self, *, activity_id: int, fueling_datetime: datetime) -> float | None:
         df_cgm = self._get_cgm_by_activity().get(activity_id)
