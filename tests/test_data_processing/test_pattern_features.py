@@ -6,7 +6,7 @@ import pytest
 
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.questionnaire import BasalAdjustment, QuestionnaireModel
-from dia_run.data_models.schemas import PatternFeaturesSchema
+from dia_run.data_models.schemas import PatternAggregateSchema, PatternFeaturesSchema
 from dia_run.data_processing.data_processing import (
     DataProcessor,
     _compute_basal_lead_time,
@@ -174,3 +174,50 @@ class TestNearestCgmValue:
         )
         result = processor._nearest_cgm_value(None, target_dt=datetime.now(), tolerance_min=7.5)
         assert result is None
+
+
+class TestAggregators:
+    def test_time_of_day_outcomes(self, *, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        result = processor.get_time_of_day_outcomes()
+
+        PatternAggregateSchema.validate(result)
+        assert set(result["bucket_dim"].unique().to_list()) == {"time_of_day"}
+        assert set(result["bucket_key"].to_list()) <= {"before_noon", "after_noon"}
+
+        features = processor.get_pattern_features()
+        assert result["n"].sum() == len(features)
+        assert (result["actionable"] == (result["n"] >= 8)).all()
+
+    def test_first20_stability_effect_drops_null_flags(self, *, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        result = processor.get_first20_stability_effect()
+
+        PatternAggregateSchema.validate(result)
+        assert set(result["bucket_dim"].unique().to_list()) <= {"stability"}
+        assert set(result["bucket_key"].to_list()) <= {"true", "false"}
+
+    def test_basal_lead_time_effect(self, *, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        result = processor.get_basal_lead_time_effect()
+
+        PatternAggregateSchema.validate(result)
+        assert set(result["bucket_dim"].unique().to_list()) <= {"basal_lead_time"}
+        allowed = {"none", "0-15", "16-30", "31-60", ">60"}
+        assert set(result["bucket_key"].to_list()) <= allowed
+
+    def test_sg20_predictor_drops_null_bins(self, *, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        result = processor.get_sg20_predictor()
+
+        PatternAggregateSchema.validate(result)
+        allowed = {"<100", "100-129", "130-159", "160-180", ">180"}
+        assert set(result["bucket_key"].to_list()) <= allowed
+
+    def test_similar_runs_cohorts_join_key(self, *, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        result = processor.get_similar_runs_cohorts()
+
+        PatternAggregateSchema.validate(result)
+        for key in result["bucket_key"].to_list():
+            assert key.count("|") == 2

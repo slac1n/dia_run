@@ -20,6 +20,7 @@ from dia_run.data_models.schemas import (
     FuelingImpactSchema,
     GlucoseStreamsSchema,
     HeartrateStreamsSchema,
+    PatternAggregateSchema,
     PatternFeaturesSchema,
     PreRunInsulinSchema,
     PreRunNutritionSummarySchema,
@@ -93,6 +94,20 @@ def _compute_basal_lead_time(questionnaire: QuestionnaireModel | None) -> tuple[
     if lead_time <= 60:
         return lead_time, "31-60"
     return lead_time, ">60"
+
+
+_PATTERN_AGGREGATE_SCHEMA: dict[str, pl.DataType] = {
+    "bucket_key": pl.Utf8,
+    "bucket_dim": pl.Utf8,
+    "n": pl.Int64,
+    "tir_median": pl.Float64,
+    "tir_mean": pl.Float64,
+    "low_event_rate": pl.Float64,
+    "good_finish_rate": pl.Float64,
+    "stable_20_rate": pl.Float64,
+    "variability_median": pl.Float64,
+    "actionable": pl.Boolean,
+}
 
 
 _PATTERN_FEATURES_SCHEMA: dict[str, pl.DataType] = {
@@ -685,6 +700,73 @@ class DataProcessor:
 
         self.df_pattern_features = pl.DataFrame(feature_rows or [], schema=_PATTERN_FEATURES_SCHEMA)
         return _typed(self.df_pattern_features)
+
+    @check_types
+    def get_time_of_day_outcomes(self) -> DataFrame[PatternAggregateSchema]:
+        df = cast(pl.DataFrame, self.get_pattern_features())
+        return _typed(self._build_pattern_aggregate(df=df, group_keys=["time_of_day_bucket"], bucket_dim="time_of_day"))
+
+    @check_types
+    def get_first20_stability_effect(self) -> DataFrame[PatternAggregateSchema]:
+        df = cast(pl.DataFrame, self.get_pattern_features()).filter(pl.col("stable_20_flag").is_not_null())
+        return _typed(self._build_pattern_aggregate(df=df, group_keys=["stable_20_flag"], bucket_dim="stability"))
+
+    @check_types
+    def get_basal_lead_time_effect(self) -> DataFrame[PatternAggregateSchema]:
+        df = cast(pl.DataFrame, self.get_pattern_features())
+        return _typed(
+            self._build_pattern_aggregate(df=df, group_keys=["basal_lead_time_bucket"], bucket_dim="basal_lead_time")
+        )
+
+    @check_types
+    def get_sg20_predictor(self) -> DataFrame[PatternAggregateSchema]:
+        df = cast(pl.DataFrame, self.get_pattern_features()).filter(pl.col("sg_20_bin").is_not_null())
+        return _typed(self._build_pattern_aggregate(df=df, group_keys=["sg_20_bin"], bucket_dim="sg20"))
+
+    @check_types
+    def get_similar_runs_cohorts(self) -> DataFrame[PatternAggregateSchema]:
+        df = cast(pl.DataFrame, self.get_pattern_features()).filter(
+            pl.col("run_type").is_not_null()
+            & pl.col("duration_band").is_not_null()
+            & pl.col("start_glucose_band").is_not_null()
+        )
+        return _typed(
+            self._build_pattern_aggregate(
+                df=df,
+                group_keys=["run_type", "duration_band", "start_glucose_band"],
+                bucket_dim="cohort",
+            )
+        )
+
+    def _build_pattern_aggregate(self, *, df: pl.DataFrame, group_keys: list[str], bucket_dim: str) -> pl.DataFrame:
+        if df.is_empty():
+            return pl.DataFrame(schema=_PATTERN_AGGREGATE_SCHEMA)
+
+        grouped = (
+            df.group_by(group_keys, maintain_order=True)
+            .agg(
+                pl.len().cast(pl.Int64).alias("n"),
+                pl.col("tir_pct").median().cast(pl.Float64).alias("tir_median"),
+                pl.col("tir_pct").mean().cast(pl.Float64).alias("tir_mean"),
+                pl.col("low_event_flag").cast(pl.Float64).mean().alias("low_event_rate"),
+                pl.col("good_finish_flag").cast(pl.Float64).mean().alias("good_finish_rate"),
+                pl.col("stable_20_flag").cast(pl.Float64).mean().alias("stable_20_rate"),
+                pl.col("run_variability_p90_p10").median().cast(pl.Float64).alias("variability_median"),
+            )
+            .with_columns([pl.col(key).cast(pl.Utf8) for key in group_keys])
+        )
+
+        if len(group_keys) == 1:
+            grouped = grouped.rename({group_keys[0]: "bucket_key"})
+        else:
+            grouped = grouped.with_columns(
+                pl.concat_str([pl.col(key) for key in group_keys], separator="|").alias("bucket_key")
+            ).drop(group_keys)
+
+        return grouped.with_columns(
+            pl.lit(bucket_dim).alias("bucket_dim"),
+            (pl.col("n") >= 8).alias("actionable"),
+        ).select(list(_PATTERN_AGGREGATE_SCHEMA.keys()))
 
     def _nearest_cgm_value(
         self, df_cgm: pl.DataFrame | None, *, target_dt: datetime, tolerance_min: float
