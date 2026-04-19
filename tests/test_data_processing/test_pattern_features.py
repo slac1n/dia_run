@@ -39,6 +39,33 @@ class TestPatternFeaturesBuild:
         second = processor.get_pattern_features()
         assert first.equals(second)
 
+    def test_activity_without_questionnaire_has_none_bucket(self, *, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        df = processor.get_pattern_features()
+        row = df.filter(pl.col("activity_id") == 1001).row(0, named=True)
+        assert row["basal_lead_time_bucket"] == "none"
+        assert row["basal_lead_time_min"] is None
+        assert row["total_carbohydrates_g"] is None
+
+    def test_basal_lead_time_resolved_from_questionnaire(self, *, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        df = processor.get_pattern_features()
+        row_1002 = df.filter(pl.col("activity_id") == 1002).row(0, named=True)
+        assert row_1002["basal_lead_time_min"] == 10
+        assert row_1002["basal_lead_time_bucket"] == "0-15"
+        row_1004 = df.filter(pl.col("activity_id") == 1004).row(0, named=True)
+        assert row_1004["basal_lead_time_min"] == 30
+        assert row_1004["basal_lead_time_bucket"] == "16-30"
+
+    def test_time_of_day_bucket_assignment(self, *, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        df = processor.get_pattern_features()
+        buckets = dict(zip(df["activity_id"].to_list(), df["time_of_day_bucket"].to_list(), strict=True))
+        assert buckets[1001] == "before_noon"
+        assert buckets[1002] == "after_noon"
+        assert buckets[1003] == "after_noon"
+        assert buckets[1004] == "before_noon"
+
 
 class TestDurationBand:
     @pytest.mark.parametrize(
