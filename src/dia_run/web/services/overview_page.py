@@ -19,6 +19,14 @@ from dia_run.dashboard.charts.fueling_impact import (
     create_fueling_carbs_vs_peak_chart,
     create_fueling_glucose_response_chart,
 )
+from dia_run.dashboard.charts.pattern_insights import (
+    create_basal_lead_time_effect_chart,
+    create_first20_stability_effect_chart,
+    create_sg20_predictor_chart,
+    create_similar_runs_benchmark_chart,
+    create_time_of_day_outcomes_chart,
+    create_time_of_day_pre_run_profile_chart,
+)
 from dia_run.dashboard.charts.run_types import (
     create_run_type_distance_chart,
     create_run_type_glucose_chart,
@@ -137,6 +145,24 @@ class OverviewPageService:
             ),
             "basal_adjustment_tir": render_plotly_figure(
                 figure=create_basal_adjustment_tir_chart(data_processor=data_processor),
+            ),
+            "time_of_day_outcomes": render_plotly_figure(
+                figure=create_time_of_day_outcomes_chart(data_processor=data_processor),
+            ),
+            "time_of_day_pre_run_profile": render_plotly_figure(
+                figure=create_time_of_day_pre_run_profile_chart(data_processor=data_processor),
+            ),
+            "first20_stability_effect": render_plotly_figure(
+                figure=create_first20_stability_effect_chart(data_processor=data_processor),
+            ),
+            "basal_lead_time_effect": render_plotly_figure(
+                figure=create_basal_lead_time_effect_chart(data_processor=data_processor),
+            ),
+            "sg20_predictor": render_plotly_figure(
+                figure=create_sg20_predictor_chart(data_processor=data_processor),
+            ),
+            "similar_runs_benchmark": render_plotly_figure(
+                figure=create_similar_runs_benchmark_chart(data_processor=data_processor),
             ),
         }
 

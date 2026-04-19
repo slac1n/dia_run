@@ -220,6 +220,12 @@ class TestOverviewPageService:
             "fueling_response",
             "fueling_carbs_peak",
             "basal_adjustment_tir",
+            "time_of_day_outcomes",
+            "time_of_day_pre_run_profile",
+            "first20_stability_effect",
+            "basal_lead_time_effect",
+            "sg20_predictor",
+            "similar_runs_benchmark",
         }
         assert set(context.charts.keys()) == expected_keys
 

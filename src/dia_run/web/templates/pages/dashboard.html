@@ -143,4 +143,40 @@
     </div>
   </div>
 </section>
+
+<section id="pattern-insights" class="section">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Pattern insights</p>
+      <h2>What predicts a good run</h2>
+    </div>
+    <p class="section-note">Cohort-level signals across time of day, first-20 stability, basal lead-time, and similar runs. Buckets with fewer than 8 runs are shown as exploratory.</p>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h3>Outcomes by time of day</h3>
+      <div class="chart-embed" data-plot-kind="time_of_day_outcomes">{{ charts.time_of_day_outcomes }}</div>
+    </div>
+    <div class="chart-card chart-card--full">
+      <h3>Pre-run profile by time of day</h3>
+      <div class="chart-embed" data-plot-kind="time_of_day_pre_run_profile">{{ charts.time_of_day_pre_run_profile }}</div>
+    </div>
+    <div class="chart-card">
+      <h3>First 20 min: stability impact</h3>
+      <div class="chart-embed" data-plot-kind="first20_stability_effect">{{ charts.first20_stability_effect }}</div>
+    </div>
+    <div class="chart-card">
+      <h3>Basal lead-time effect</h3>
+      <div class="chart-embed" data-plot-kind="basal_lead_time_effect">{{ charts.basal_lead_time_effect }}</div>
+    </div>
+    <div class="chart-card">
+      <h3>Glucose at +20 min as predictor</h3>
+      <div class="chart-embed" data-plot-kind="sg20_predictor">{{ charts.sg20_predictor }}</div>
+    </div>
+    <div class="chart-card chart-card--full">
+      <h3>Similar-runs benchmark</h3>
+      <div class="chart-embed" data-plot-kind="similar_runs_benchmark">{{ charts.similar_runs_benchmark }}</div>
+    </div>
+  </div>
+</section>
 {% endblock %}
