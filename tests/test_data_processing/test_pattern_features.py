@@ -1,9 +1,18 @@
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import plotly.graph_objects as go
 import polars as pl
 import pytest
 
+from dia_run.dashboard.charts.pattern_insights import (
+    create_basal_lead_time_effect_chart,
+    create_first20_stability_effect_chart,
+    create_sg20_predictor_chart,
+    create_similar_runs_benchmark_chart,
+    create_time_of_day_outcomes_chart,
+    create_time_of_day_pre_run_profile_chart,
+)
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.questionnaire import BasalAdjustment, QuestionnaireModel
 from dia_run.data_models.schemas import PatternAggregateSchema, PatternFeaturesSchema
@@ -221,3 +230,21 @@ class TestAggregators:
         PatternAggregateSchema.validate(result)
         for key in result["bucket_key"].to_list():
             assert key.count("|") == 2
+
+
+class TestPatternInsightChartsSmoke:
+    @pytest.mark.parametrize(
+        "builder",
+        [
+            create_time_of_day_outcomes_chart,
+            create_time_of_day_pre_run_profile_chart,
+            create_first20_stability_effect_chart,
+            create_basal_lead_time_effect_chart,
+            create_sg20_predictor_chart,
+            create_similar_runs_benchmark_chart,
+        ],
+    )
+    def test_builders_return_figure(self, *, test_data_paths: DataPaths, builder) -> None:  # type: ignore[no-untyped-def]
+        processor = DataProcessor(test_data_paths)
+        fig = builder(data_processor=processor)
+        assert isinstance(fig, go.Figure)
