@@ -18,6 +18,7 @@ from dia_run.data_models.schemas import (
     BaseGlucoseStreamSchema,
     FuelingGlucoseWindowSchema,
     FuelingImpactSchema,
+    FuelingTimingAggregateSchema,
     GlucoseStreamsSchema,
     HeartrateStreamsSchema,
     PatternAggregateSchema,
@@ -79,6 +80,18 @@ def _compute_glucose_band(value: float | None) -> str | None:
     return ">180"
 
 
+def _compute_fueling_timing_bucket(time_during_run_min: int) -> str:
+    if time_during_run_min <= 15:
+        return "0-15"
+    if time_during_run_min <= 30:
+        return "16-30"
+    if time_during_run_min <= 60:
+        return "31-60"
+    if time_during_run_min <= 90:
+        return "61-90"
+    return ">90"
+
+
 def _compute_basal_lead_time(questionnaire: QuestionnaireModel | None) -> tuple[int | None, str]:
     if questionnaire is None or not questionnaire.basal_adjustments:
         return None, "none"
@@ -108,6 +121,16 @@ _PATTERN_AGGREGATE_SCHEMA: dict[str, pl.DataType] = {
     "actionable": pl.Boolean,
 }
 
+_FUELING_AGGREGATE_SCHEMA: dict[str, pl.DataType] = {
+    "bucket_key": pl.Utf8,
+    "bucket_dim": pl.Utf8,
+    "n": pl.Int64,
+    "post_tir_rate": pl.Float64,
+    "avoided_low_rate": pl.Float64,
+    "peak_in_range_rate": pl.Float64,
+    "actionable": pl.Boolean,
+}
+
 
 class DataProcessor:
     def __init__(self, data_paths: DataPaths | None = None) -> None:
@@ -125,6 +148,7 @@ class DataProcessor:
         self._activity_outcomes: pl.DataFrame | None = None
         self._stable_20_flags: pl.DataFrame | None = None
         self._sg_20_bins: pl.DataFrame | None = None
+        self._fueling_event_metrics: pl.DataFrame | None = None
 
     @check_types
     def get_summary(self) -> DataFrame[SummarySchema]:
@@ -449,6 +473,103 @@ class DataProcessor:
             }
         )
         return _typed(self.df_fueling_impact)
+
+    def _compute_fueling_event_metrics(self) -> pl.DataFrame:
+        if self._fueling_event_metrics is not None:
+            return self._fueling_event_metrics
+
+        df_impact = cast(pl.DataFrame, self.get_fueling_impact())
+        df_windows = cast(pl.DataFrame, self.get_fueling_glucose_windows())
+        questionnaires = self._get_questionnaire_cache()
+
+        metric_rows: list[dict[str, Any]] = []
+        for row in df_impact.iter_rows(named=True):
+            activity_id: int = row["activity_id"]
+            fueling_index: int = row["fueling_index"]
+            baseline_sg: float | None = row["baseline_sg"]
+            peak_sg: float | None = row["peak_sg"]
+
+            questionnaire = questionnaires.get(activity_id)
+            if questionnaire is None or fueling_index >= len(questionnaire.fueling_during_run):
+                continue
+            time_during_run_min = questionnaire.fueling_during_run[fueling_index].time_during_run_min
+
+            post_window = df_windows.filter(
+                (pl.col("activity_id") == activity_id)
+                & (pl.col("fueling_index") == fueling_index)
+                & (pl.col("minutes_relative") >= 0)
+                & (pl.col("minutes_relative") <= self.FUELING_WINDOW_MINUTES)
+            ).drop_nulls("value")
+
+            if post_window.is_empty():
+                post_tir_rate: float | None = None
+                avoided_low: bool | None = None
+            else:
+                post_values = post_window["value"]
+                post_tir_rate = float(
+                    post_values.is_between(TARGET_GLUCOSE_LOWER, TARGET_GLUCOSE_UPPER).mean()  # type: ignore[arg-type]
+                )
+                avoided_low = bool((post_values >= TARGET_GLUCOSE_LOWER).all())
+
+            peak_in_range: bool | None = peak_sg <= TARGET_GLUCOSE_UPPER if peak_sg is not None else None
+
+            metric_rows.append(
+                {
+                    "activity_id": activity_id,
+                    "fueling_index": fueling_index,
+                    "time_into_run_bucket": _compute_fueling_timing_bucket(time_during_run_min),
+                    "sg_at_fueling_band": _compute_glucose_band(baseline_sg),
+                    "post_tir_rate": post_tir_rate,
+                    "avoided_low": avoided_low,
+                    "peak_in_range": peak_in_range,
+                }
+            )
+
+        self._fueling_event_metrics = pl.DataFrame(
+            metric_rows or [],
+            schema={
+                "activity_id": pl.Int64,
+                "fueling_index": pl.Int64,
+                "time_into_run_bucket": pl.Utf8,
+                "sg_at_fueling_band": pl.Utf8,
+                "post_tir_rate": pl.Float64,
+                "avoided_low": pl.Boolean,
+                "peak_in_range": pl.Boolean,
+            },
+        )
+        return self._fueling_event_metrics
+
+    @check_types
+    def get_fueling_timing_effect(self) -> DataFrame[FuelingTimingAggregateSchema]:
+        df = self._compute_fueling_event_metrics().filter(pl.col("time_into_run_bucket").is_not_null())
+        return _typed(self._build_fueling_aggregate(df=df, group_key="time_into_run_bucket", bucket_dim="fueling_time"))
+
+    @check_types
+    def get_fueling_sg_effect(self) -> DataFrame[FuelingTimingAggregateSchema]:
+        df = self._compute_fueling_event_metrics().filter(pl.col("sg_at_fueling_band").is_not_null())
+        return _typed(self._build_fueling_aggregate(df=df, group_key="sg_at_fueling_band", bucket_dim="fueling_sg"))
+
+    def _build_fueling_aggregate(self, *, df: pl.DataFrame, group_key: str, bucket_dim: str) -> pl.DataFrame:
+        if df.is_empty():
+            return pl.DataFrame(schema=_FUELING_AGGREGATE_SCHEMA)
+
+        grouped = (
+            df.group_by(group_key, maintain_order=True)
+            .agg(
+                pl.len().cast(pl.Int64).alias("n"),
+                pl.col("post_tir_rate").mean().cast(pl.Float64).alias("post_tir_rate"),
+                pl.col("avoided_low").cast(pl.Float64).mean().alias("avoided_low_rate"),
+                pl.col("peak_in_range").cast(pl.Float64).mean().alias("peak_in_range_rate"),
+            )
+            .with_columns(pl.col(group_key).cast(pl.Utf8))
+            .rename({group_key: "bucket_key"})
+            .with_columns(
+                pl.lit(bucket_dim).alias("bucket_dim"),
+                (pl.col("n") >= 8).alias("actionable"),
+            )
+            .select(list(_FUELING_AGGREGATE_SCHEMA.keys()))
+        )
+        return grouped
 
     @check_types
     def get_basal_adjustment_tir(self) -> DataFrame[BasalAdjustmentTirSchema]:
