@@ -21,6 +21,8 @@ from dia_run.dashboard.charts.diabetes_management import (
 from dia_run.dashboard.charts.fueling_impact import (
     create_fueling_carbs_vs_peak_chart,
     create_fueling_glucose_response_chart,
+    create_fueling_sg_chart,
+    create_fueling_timing_chart,
 )
 from dia_run.dashboard.charts.pattern_insights import (
     create_first20_stability_effect_chart,
@@ -143,6 +145,12 @@ class OverviewPageService:
             ),
             "fueling_carbs_peak": render_plotly_figure(
                 figure=create_fueling_carbs_vs_peak_chart(data_processor=data_processor),
+            ),
+            "fueling_timing_effect": render_plotly_figure(
+                figure=create_fueling_timing_chart(data_processor=data_processor),
+            ),
+            "fueling_sg_effect": render_plotly_figure(
+                figure=create_fueling_sg_chart(data_processor=data_processor),
             ),
             "basal_adjustment_tir": render_plotly_figure(
                 figure=create_basal_adjustment_tir_chart(data_processor=data_processor),

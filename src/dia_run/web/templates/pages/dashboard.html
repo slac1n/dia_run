@@ -125,6 +125,14 @@
       <h3>Carbs vs peak increase</h3>
       <div class="chart-embed" data-plot-kind="fueling_carbs_peak">{{ charts.fueling_carbs_peak }}</div>
     </div>
+    <div class="chart-card">
+      <h3>Best time to fuel during the run</h3>
+      <div class="chart-embed" data-plot-kind="fueling_timing_effect">{{ charts.fueling_timing_effect }}</div>
+    </div>
+    <div class="chart-card">
+      <h3>Best SG level when fueling</h3>
+      <div class="chart-embed" data-plot-kind="fueling_sg_effect">{{ charts.fueling_sg_effect }}</div>
+    </div>
   </div>
 </section>
 
@@ -141,6 +149,10 @@
       <h3>Time in range during basal adjustments</h3>
       <div class="chart-embed" data-plot-kind="basal_adjustment_tir">{{ charts.basal_adjustment_tir }}</div>
     </div>
+    <div class="chart-card chart-card--full">
+      <h3>Basal lead-time vs TIR and early stability</h3>
+      <div class="chart-embed" data-plot-kind="basal_lead_time_effect">{{ charts.basal_lead_time_effect }}</div>
+    </div>
   </div>
 </section>
 
@@ -150,7 +162,8 @@
       <p class="eyebrow">Pattern insights</p>
       <h2>What predicts a good run</h2>
     </div>
-    <p class="section-note">Cohort-level signals across time of day, first-20 stability, basal lead-time, and similar runs. Buckets with fewer than 8 runs are shown as exploratory.</p>
+    <p class="section-note">Cohort-level signals across time of day, first-20 stability, and similar runs. Buckets with fewer than 8 runs are shown as exploratory.</p>
+    <p class="section-note"><strong>Stable first 20 min</strong> means every CGM reading between start and +20 min is within 100-180 mg/dL and the change from start is no more than 20 mg/dL. <strong>Good finish</strong> means the final in-run reading is within 100-180 mg/dL.</p>
   </div>
   <div class="chart-grid">
     <div class="chart-card">
@@ -160,10 +173,6 @@
     <div class="chart-card">
       <h3>First 20 min: stability impact</h3>
       <div class="chart-embed" data-plot-kind="first20_stability_effect">{{ charts.first20_stability_effect }}</div>
-    </div>
-    <div class="chart-card">
-      <h3>Basal lead-time effect</h3>
-      <div class="chart-embed" data-plot-kind="basal_lead_time_effect">{{ charts.basal_lead_time_effect }}</div>
     </div>
     <div class="chart-card">
       <h3>Glucose at +20 min as predictor</h3>

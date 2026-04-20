@@ -219,6 +219,8 @@ class TestOverviewPageService:
             "pre_nutrition_heatmap",
             "fueling_response",
             "fueling_carbs_peak",
+            "fueling_timing_effect",
+            "fueling_sg_effect",
             "basal_adjustment_tir",
             "time_of_day_outcomes",
             "first20_stability_effect",
