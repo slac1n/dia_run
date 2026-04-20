@@ -267,35 +267,6 @@ classDiagram
         +float tir_pct
     }
 
-    class PatternFeaturesSchema {
-        <<DataFrameModel>>
-        +int activity_id
-        +str name_date
-        +datetime start_date_local
-        +str run_type
-        +float tir_pct
-        +float out_going_sg
-        +bool good_finish_flag
-        +bool low_event_flag
-        +float run_variability_p90_p10
-        +float sg_start
-        +float sg_20
-        +float early_delta_20
-        +bool early_in_range_flag
-        +bool stable_20_flag
-        +float early_span_20
-        +str time_of_day_bucket
-        +str duration_band
-        +str start_glucose_band
-        +str sg_20_bin
-        +int basal_lead_time_min
-        +str basal_lead_time_bucket
-        +float insulin_on_board_in_going
-        +int total_carbohydrates_g
-        +int earliest_time_before_start_min
-        +float avg_bolus_percentage
-    }
-
     class PatternAggregateSchema {
         <<DataFrameModel>>
         +str bucket_key
@@ -307,6 +278,17 @@ classDiagram
         +float good_finish_rate
         +float stable_20_rate
         +float variability_median
+        +bool actionable
+    }
+
+    class FuelingTimingAggregateSchema {
+        <<DataFrameModel>>
+        +str bucket_key
+        +str bucket_dim
+        +int n
+        +float post_tir_rate
+        +float avoided_low_rate
+        +float peak_in_range_rate
         +bool actionable
     }
 
@@ -333,12 +315,13 @@ classDiagram
         +get_fueling_glucose_windows() DataFrame~FuelingGlucoseWindowSchema~
         +get_fueling_impact() DataFrame~FuelingImpactSchema~
         +get_basal_adjustment_tir() DataFrame~BasalAdjustmentTirSchema~
-        +get_pattern_features() DataFrame~PatternFeaturesSchema~
         +get_time_of_day_outcomes() DataFrame~PatternAggregateSchema~
         +get_first20_stability_effect() DataFrame~PatternAggregateSchema~
         +get_basal_lead_time_effect() DataFrame~PatternAggregateSchema~
         +get_sg20_predictor() DataFrame~PatternAggregateSchema~
         +get_similar_runs_cohorts() DataFrame~PatternAggregateSchema~
+        +get_fueling_timing_effect() DataFrame~FuelingTimingAggregateSchema~
+        +get_fueling_sg_effect() DataFrame~FuelingTimingAggregateSchema~
     }
 
     DataProcessor --> DataPaths
@@ -353,8 +336,8 @@ classDiagram
     DataProcessor ..> FuelingGlucoseWindowSchema : returns
     DataProcessor ..> FuelingImpactSchema : returns
     DataProcessor ..> BasalAdjustmentTirSchema : returns
-    DataProcessor ..> PatternFeaturesSchema : returns
     DataProcessor ..> PatternAggregateSchema : returns
+    DataProcessor ..> FuelingTimingAggregateSchema : returns
 
     class DashboardOverviewData {
         +DataFrame summary
@@ -476,6 +459,8 @@ classDiagram
         <<module>>
         +create_fueling_glucose_response_chart(data_processor) Figure
         +create_fueling_carbs_vs_peak_chart(data_processor) Figure
+        +create_fueling_timing_chart(data_processor) Figure
+        +create_fueling_sg_chart(data_processor) Figure
     }
 
     class ActivityCalendarCharts {
@@ -486,14 +471,13 @@ classDiagram
     class BasalAdjustmentImpactCharts {
         <<module>>
         +create_basal_adjustment_tir_chart(data_processor) Figure
+        +create_basal_lead_time_effect_chart(data_processor) Figure
     }
 
     class PatternInsightsCharts {
         <<module>>
         +create_time_of_day_outcomes_chart(data_processor) Figure
-        +create_time_of_day_pre_run_profile_chart(data_processor) Figure
         +create_first20_stability_effect_chart(data_processor) Figure
-        +create_basal_lead_time_effect_chart(data_processor) Figure
         +create_sg20_predictor_chart(data_processor) Figure
         +create_similar_runs_benchmark_chart(data_processor) Figure
     }
