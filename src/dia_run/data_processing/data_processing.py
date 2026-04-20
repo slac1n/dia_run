@@ -21,7 +21,6 @@ from dia_run.data_models.schemas import (
     GlucoseStreamsSchema,
     HeartrateStreamsSchema,
     PatternAggregateSchema,
-    PatternFeaturesSchema,
     PreRunInsulinSchema,
     PreRunNutritionSummarySchema,
     SpecificCarelinkSchema,
@@ -87,13 +86,13 @@ def _compute_basal_lead_time(questionnaire: QuestionnaireModel | None) -> tuple[
     if not pre_run_starts:
         return None, "none"
     lead_time = -min(pre_run_starts)
-    if lead_time <= 15:
-        return lead_time, "0-15"
     if lead_time <= 30:
-        return lead_time, "16-30"
+        return lead_time, "0-30"
     if lead_time <= 60:
         return lead_time, "31-60"
-    return lead_time, ">60"
+    if lead_time <= 90:
+        return lead_time, "61-90"
+    return lead_time, ">90"
 
 
 _PATTERN_AGGREGATE_SCHEMA: dict[str, pl.DataType] = {
@@ -110,35 +109,6 @@ _PATTERN_AGGREGATE_SCHEMA: dict[str, pl.DataType] = {
 }
 
 
-_PATTERN_FEATURES_SCHEMA: dict[str, pl.DataType] = {
-    "activity_id": pl.Int64,
-    "name_date": pl.Utf8,
-    "start_date_local": pl.Datetime,
-    "run_type": pl.Utf8,
-    "tir_pct": pl.Float64,
-    "out_going_sg": pl.Float64,
-    "good_finish_flag": pl.Boolean,
-    "low_event_flag": pl.Boolean,
-    "run_variability_p90_p10": pl.Float64,
-    "sg_start": pl.Float64,
-    "sg_20": pl.Float64,
-    "early_delta_20": pl.Float64,
-    "early_in_range_flag": pl.Boolean,
-    "stable_20_flag": pl.Boolean,
-    "early_span_20": pl.Float64,
-    "time_of_day_bucket": pl.Utf8,
-    "duration_band": pl.Utf8,
-    "start_glucose_band": pl.Utf8,
-    "sg_20_bin": pl.Utf8,
-    "basal_lead_time_min": pl.Int64,
-    "basal_lead_time_bucket": pl.Utf8,
-    "insulin_on_board_in_going": pl.Float64,
-    "total_carbohydrates_g": pl.Int64,
-    "earliest_time_before_start_min": pl.Int64,
-    "avg_bolus_percentage": pl.Float64,
-}
-
-
 class DataProcessor:
     def __init__(self, data_paths: DataPaths | None = None) -> None:
         self.data_paths = data_paths or DataPaths()
@@ -149,10 +119,12 @@ class DataProcessor:
         self.df_fueling_glucose_windows: pl.DataFrame | None = None
         self.df_fueling_impact: pl.DataFrame | None = None
         self.df_basal_adjustment_tir: pl.DataFrame | None = None
-        self.df_pattern_features: pl.DataFrame | None = None
         self.df_cgm: pl.DataFrame | None = None
         self._cgm_by_activity: dict[int, pl.DataFrame] | None = None
         self._questionnaire_cache: dict[int, QuestionnaireModel] | None = None
+        self._activity_outcomes: pl.DataFrame | None = None
+        self._stable_20_flags: pl.DataFrame | None = None
+        self._sg_20_bins: pl.DataFrame | None = None
 
     @check_types
     def get_summary(self) -> DataFrame[SummarySchema]:
@@ -580,155 +552,213 @@ class DataProcessor:
         )
         return _typed(self.df_basal_adjustment_tir)
 
-    @check_types
-    def get_pattern_features(self) -> DataFrame[PatternFeaturesSchema]:
-        if self.df_pattern_features is not None:
-            return _typed(self.df_pattern_features)
+    def _get_activity_outcomes(self) -> pl.DataFrame:
+        if self._activity_outcomes is not None:
+            return self._activity_outcomes
+
+        lf_summary = self._load_summary_data()
+        lf_cgm_metrics = (
+            self._load_glucose_data(lf_summary)
+            .drop_nulls("value")
+            .group_by("activity_id")
+            .agg(
+                (pl.col("value").is_between(TARGET_GLUCOSE_LOWER, TARGET_GLUCOSE_UPPER).mean() * 100)
+                .round(1)
+                .cast(pl.Float64)
+                .alias("tir_pct"),
+                (pl.col("value") < TARGET_GLUCOSE_LOWER).any().alias("low_event_flag"),
+                (pl.col("value").quantile(0.9) - pl.col("value").quantile(0.1))
+                .round(1)
+                .cast(pl.Float64)
+                .alias("run_variability_p90_p10"),
+            )
+        )
 
         df_summary = cast(pl.DataFrame, self.get_summary())
-        df_nutrition = cast(pl.DataFrame, self.get_pre_run_nutrition_summary())
-        questionnaires = self._get_questionnaire_cache()
+        self._activity_outcomes = (
+            df_summary.lazy()
+            .select("activity_id", "out_going_sg")
+            .join(lf_cgm_metrics, on="activity_id", how="left")
+            .with_columns(
+                pl.col("out_going_sg").is_between(TARGET_GLUCOSE_LOWER, TARGET_GLUCOSE_UPPER).alias("good_finish_flag")
+            )
+            .select(
+                "activity_id",
+                "tir_pct",
+                "good_finish_flag",
+                "low_event_flag",
+                "run_variability_p90_p10",
+            )
+            .collect()
+        )
+        return self._activity_outcomes
+
+    def _get_time_of_day_buckets(self) -> pl.DataFrame:
+        df_summary = cast(pl.DataFrame, self.get_summary())
+        hour = pl.col("start_date_local").dt.hour()
+        return df_summary.select(
+            "activity_id",
+            pl.when(hour.is_between(5, 11))
+            .then(pl.lit("morning"))
+            .when(hour.is_between(15, 21))
+            .then(pl.lit("evening"))
+            .otherwise(pl.lit(None, dtype=pl.Utf8))
+            .alias("time_of_day_bucket"),
+        )
+
+    def _get_stable_20_flags(self) -> pl.DataFrame:
+        if self._stable_20_flags is not None:
+            return self._stable_20_flags
+
+        df_summary = cast(pl.DataFrame, self.get_summary())
         cgm_by_activity = self._get_cgm_by_activity()
-
-        nutrition_by_id: dict[int, dict[str, Any]] = {
-            int(row["activity_id"]): row for row in df_nutrition.iter_rows(named=True)
-        }
-
-        feature_rows: list[dict[str, Any]] = []
+        rows: list[dict[str, Any]] = []
         for row in df_summary.iter_rows(named=True):
             activity_id = int(row["activity_id"])
-            start_date_local: datetime = row["start_date_local"]
-            end_date_local: datetime = row["end_date_local"]
-            out_going_sg = row["out_going_sg"]
-
+            start_dt: datetime = row["start_date_local"]
             df_cgm = cgm_by_activity.get(activity_id)
 
-            sg_start = self._nearest_cgm_value(df_cgm, target_dt=start_date_local, tolerance_min=SG_TOLERANCE_MINUTES)
+            sg_start = self._nearest_cgm_value(df_cgm, target_dt=start_dt, tolerance_min=SG_TOLERANCE_MINUTES)
             sg_20 = self._nearest_cgm_value(
                 df_cgm,
-                target_dt=start_date_local + timedelta(minutes=EARLY_WINDOW_MINUTES),
+                target_dt=start_dt + timedelta(minutes=EARLY_WINDOW_MINUTES),
                 tolerance_min=SG_TOLERANCE_MINUTES,
             )
-            early_delta_20 = sg_20 - sg_start if (sg_start is not None and sg_20 is not None) else None
 
-            low_event_flag: bool | None = None
-            run_variability_p90_p10: float | None = None
-            early_in_range_flag: bool | None = None
-            early_span_20: float | None = None
-
-            if df_cgm is not None and not df_cgm.is_empty():
-                df_valid = df_cgm.drop_nulls("value")
-                if not df_valid.is_empty():
-                    df_in_run = df_valid.filter(
-                        (pl.col("datetime") >= start_date_local) & (pl.col("datetime") <= end_date_local)
+            stable_flag: bool | None = None
+            if df_cgm is not None and sg_start is not None and sg_20 is not None:
+                df_early = df_cgm.drop_nulls("value").filter(
+                    (pl.col("datetime") >= start_dt)
+                    & (pl.col("datetime") <= start_dt + timedelta(minutes=EARLY_WINDOW_MINUTES))
+                )
+                if not df_early.is_empty():
+                    early_values = df_early["value"]
+                    early_in_range = bool(
+                        (early_values >= TARGET_GLUCOSE_LOWER).all() and (early_values <= TARGET_GLUCOSE_UPPER).all()
                     )
-                    if not df_in_run.is_empty():
-                        in_run_values = df_in_run["value"]
-                        low_event_flag = bool((in_run_values < TARGET_GLUCOSE_LOWER).any())
-                        p90 = in_run_values.quantile(0.9)
-                        p10 = in_run_values.quantile(0.1)
-                        if p90 is not None and p10 is not None:
-                            run_variability_p90_p10 = round(float(p90) - float(p10), 1)
+                    stable_flag = bool(early_in_range and abs(sg_20 - sg_start) <= STABLE_DELTA_LIMIT)
 
-                    df_early = df_valid.filter(
-                        (pl.col("datetime") >= start_date_local)
-                        & (pl.col("datetime") <= start_date_local + timedelta(minutes=EARLY_WINDOW_MINUTES))
-                    )
-                    if not df_early.is_empty():
-                        early_values = df_early["value"]
-                        early_in_range_flag = bool(
-                            (early_values >= TARGET_GLUCOSE_LOWER).all()
-                            and (early_values <= TARGET_GLUCOSE_UPPER).all()
-                        )
-                        early_span_20 = round(float(early_values.max()) - float(early_values.min()), 1)  # type: ignore[arg-type]
+            rows.append({"activity_id": activity_id, "stable_20_flag": stable_flag})
 
-            stable_20_flag: bool | None
-            if (
-                early_in_range_flag is not None
-                and sg_start is not None
-                and sg_20 is not None
-                and early_delta_20 is not None
-            ):
-                stable_20_flag = bool(early_in_range_flag and abs(early_delta_20) <= STABLE_DELTA_LIMIT)
-            else:
-                stable_20_flag = None
+        self._stable_20_flags = pl.DataFrame(
+            rows or [],
+            schema={"activity_id": pl.Int64, "stable_20_flag": pl.Boolean},
+        )
+        return self._stable_20_flags
 
-            good_finish_flag: bool | None = (
-                bool(TARGET_GLUCOSE_LOWER <= out_going_sg <= TARGET_GLUCOSE_UPPER) if out_going_sg is not None else None
+    def _get_sg_20_bins(self) -> pl.DataFrame:
+        if self._sg_20_bins is not None:
+            return self._sg_20_bins
+
+        df_summary = cast(pl.DataFrame, self.get_summary())
+        cgm_by_activity = self._get_cgm_by_activity()
+        rows: list[dict[str, Any]] = []
+        for row in df_summary.iter_rows(named=True):
+            activity_id = int(row["activity_id"])
+            start_dt: datetime = row["start_date_local"]
+            sg_20 = self._nearest_cgm_value(
+                cgm_by_activity.get(activity_id),
+                target_dt=start_dt + timedelta(minutes=EARLY_WINDOW_MINUTES),
+                tolerance_min=SG_TOLERANCE_MINUTES,
             )
+            rows.append({"activity_id": activity_id, "sg_20_bin": _compute_glucose_band(sg_20)})
 
-            time_of_day_bucket = "before_noon" if start_date_local.hour < 12 else "after_noon"
-            duration_band = _compute_duration_band(int(row["moving_time"]))
-            start_glucose_band = _compute_glucose_band(sg_start)
-            sg_20_bin = _compute_glucose_band(sg_20)
+        self._sg_20_bins = pl.DataFrame(
+            rows or [],
+            schema={"activity_id": pl.Int64, "sg_20_bin": pl.Utf8},
+        )
+        return self._sg_20_bins
 
-            basal_lead_time_min, basal_lead_time_bucket = _compute_basal_lead_time(questionnaires.get(activity_id))
+    def _get_basal_lead_time_buckets(self) -> pl.DataFrame:
+        df_summary = cast(pl.DataFrame, self.get_summary())
+        questionnaires = self._get_questionnaire_cache()
+        rows: list[dict[str, str | int]] = [
+            {
+                "activity_id": int(row["activity_id"]),
+                "basal_lead_time_bucket": _compute_basal_lead_time(questionnaires.get(int(row["activity_id"])))[1],
+            }
+            for row in df_summary.iter_rows(named=True)
+        ]
+        return pl.DataFrame(
+            rows or [],
+            schema={"activity_id": pl.Int64, "basal_lead_time_bucket": pl.Utf8},
+        )
 
-            nutrition = nutrition_by_id.get(activity_id)
-
-            feature_rows.append(
-                {
-                    "activity_id": activity_id,
-                    "name_date": row["name_date"],
-                    "start_date_local": start_date_local,
-                    "run_type": row["run_type"],
-                    "tir_pct": row["tir_pct"],
-                    "out_going_sg": out_going_sg,
-                    "good_finish_flag": good_finish_flag,
-                    "low_event_flag": low_event_flag,
-                    "run_variability_p90_p10": run_variability_p90_p10,
-                    "sg_start": sg_start,
-                    "sg_20": sg_20,
-                    "early_delta_20": round(early_delta_20, 1) if early_delta_20 is not None else None,
-                    "early_in_range_flag": early_in_range_flag,
-                    "stable_20_flag": stable_20_flag,
-                    "early_span_20": early_span_20,
-                    "time_of_day_bucket": time_of_day_bucket,
-                    "duration_band": duration_band,
-                    "start_glucose_band": start_glucose_band,
-                    "sg_20_bin": sg_20_bin,
-                    "basal_lead_time_min": basal_lead_time_min,
-                    "basal_lead_time_bucket": basal_lead_time_bucket,
-                    "insulin_on_board_in_going": row["insulin_on_board_in_going"],
-                    "total_carbohydrates_g": nutrition["total_carbohydrates_g"] if nutrition else None,
-                    "earliest_time_before_start_min": nutrition["earliest_time_before_start_min"]
-                    if nutrition
-                    else None,
-                    "avg_bolus_percentage": nutrition["avg_bolus_percentage"] if nutrition else None,
-                }
-            )
-
-        self.df_pattern_features = pl.DataFrame(feature_rows or [], schema=_PATTERN_FEATURES_SCHEMA)
-        return _typed(self.df_pattern_features)
+    def _get_duration_and_start_bands(self) -> pl.DataFrame:
+        df_summary = cast(pl.DataFrame, self.get_summary())
+        return df_summary.select(
+            "activity_id",
+            "run_type",
+            pl.when(pl.col("moving_time") <= 45 * 60)
+            .then(pl.lit("<=45"))
+            .when(pl.col("moving_time") <= 75 * 60)
+            .then(pl.lit("46-75"))
+            .when(pl.col("moving_time") <= 120 * 60)
+            .then(pl.lit("76-120"))
+            .otherwise(pl.lit(">120"))
+            .alias("duration_band"),
+            pl.when(pl.col("in_going_sg").is_null())
+            .then(pl.lit(None, dtype=pl.Utf8))
+            .when(pl.col("in_going_sg") < 100)
+            .then(pl.lit("<100"))
+            .when(pl.col("in_going_sg") <= 129)
+            .then(pl.lit("100-129"))
+            .when(pl.col("in_going_sg") <= 159)
+            .then(pl.lit("130-159"))
+            .when(pl.col("in_going_sg") <= 180)
+            .then(pl.lit("160-180"))
+            .otherwise(pl.lit(">180"))
+            .alias("start_glucose_band"),
+        )
 
     @check_types
     def get_time_of_day_outcomes(self) -> DataFrame[PatternAggregateSchema]:
-        df = cast(pl.DataFrame, self.get_pattern_features())
+        df = (
+            self._get_activity_outcomes()
+            .join(self._get_time_of_day_buckets(), on="activity_id", how="inner")
+            .filter(pl.col("time_of_day_bucket").is_not_null())
+        )
         return _typed(self._build_pattern_aggregate(df=df, group_keys=["time_of_day_bucket"], bucket_dim="time_of_day"))
 
     @check_types
     def get_first20_stability_effect(self) -> DataFrame[PatternAggregateSchema]:
-        df = cast(pl.DataFrame, self.get_pattern_features()).filter(pl.col("stable_20_flag").is_not_null())
+        df = (
+            self._get_activity_outcomes()
+            .join(self._get_stable_20_flags(), on="activity_id", how="inner")
+            .filter(pl.col("stable_20_flag").is_not_null())
+        )
         return _typed(self._build_pattern_aggregate(df=df, group_keys=["stable_20_flag"], bucket_dim="stability"))
 
     @check_types
     def get_basal_lead_time_effect(self) -> DataFrame[PatternAggregateSchema]:
-        df = cast(pl.DataFrame, self.get_pattern_features())
+        df = (
+            self._get_activity_outcomes()
+            .join(self._get_basal_lead_time_buckets(), on="activity_id", how="inner")
+            .join(self._get_stable_20_flags(), on="activity_id", how="left")
+        )
         return _typed(
             self._build_pattern_aggregate(df=df, group_keys=["basal_lead_time_bucket"], bucket_dim="basal_lead_time")
         )
 
     @check_types
     def get_sg20_predictor(self) -> DataFrame[PatternAggregateSchema]:
-        df = cast(pl.DataFrame, self.get_pattern_features()).filter(pl.col("sg_20_bin").is_not_null())
+        df = (
+            self._get_activity_outcomes()
+            .join(self._get_sg_20_bins(), on="activity_id", how="inner")
+            .filter(pl.col("sg_20_bin").is_not_null())
+        )
         return _typed(self._build_pattern_aggregate(df=df, group_keys=["sg_20_bin"], bucket_dim="sg20"))
 
     @check_types
     def get_similar_runs_cohorts(self) -> DataFrame[PatternAggregateSchema]:
-        df = cast(pl.DataFrame, self.get_pattern_features()).filter(
-            pl.col("run_type").is_not_null()
-            & pl.col("duration_band").is_not_null()
-            & pl.col("start_glucose_band").is_not_null()
+        df = (
+            self._get_activity_outcomes()
+            .join(self._get_duration_and_start_bands(), on="activity_id", how="inner")
+            .filter(
+                pl.col("run_type").is_not_null()
+                & pl.col("duration_band").is_not_null()
+                & pl.col("start_glucose_band").is_not_null()
+            )
         )
         return _typed(
             self._build_pattern_aggregate(
@@ -742,19 +772,25 @@ class DataProcessor:
         if df.is_empty():
             return pl.DataFrame(schema=_PATTERN_AGGREGATE_SCHEMA)
 
+        has_stable = "stable_20_flag" in df.columns
+        agg_exprs: list[pl.Expr] = [
+            pl.len().cast(pl.Int64).alias("n"),
+            pl.col("tir_pct").median().cast(pl.Float64).alias("tir_median"),
+            pl.col("tir_pct").mean().cast(pl.Float64).alias("tir_mean"),
+            pl.col("low_event_flag").cast(pl.Float64).mean().alias("low_event_rate"),
+            pl.col("good_finish_flag").cast(pl.Float64).mean().alias("good_finish_rate"),
+            pl.col("run_variability_p90_p10").median().cast(pl.Float64).alias("variability_median"),
+        ]
+        if has_stable:
+            agg_exprs.append(pl.col("stable_20_flag").cast(pl.Float64).mean().alias("stable_20_rate"))
+
         grouped = (
             df.group_by(group_keys, maintain_order=True)
-            .agg(
-                pl.len().cast(pl.Int64).alias("n"),
-                pl.col("tir_pct").median().cast(pl.Float64).alias("tir_median"),
-                pl.col("tir_pct").mean().cast(pl.Float64).alias("tir_mean"),
-                pl.col("low_event_flag").cast(pl.Float64).mean().alias("low_event_rate"),
-                pl.col("good_finish_flag").cast(pl.Float64).mean().alias("good_finish_rate"),
-                pl.col("stable_20_flag").cast(pl.Float64).mean().alias("stable_20_rate"),
-                pl.col("run_variability_p90_p10").median().cast(pl.Float64).alias("variability_median"),
-            )
+            .agg(agg_exprs)
             .with_columns([pl.col(key).cast(pl.Utf8) for key in group_keys])
         )
+        if not has_stable:
+            grouped = grouped.with_columns(pl.lit(None, dtype=pl.Float64).alias("stable_20_rate"))
 
         if len(group_keys) == 1:
             grouped = grouped.rename({group_keys[0]: "bucket_key"})

@@ -11,11 +11,10 @@ from dia_run.dashboard.charts.pattern_insights import (
     create_sg20_predictor_chart,
     create_similar_runs_benchmark_chart,
     create_time_of_day_outcomes_chart,
-    create_time_of_day_pre_run_profile_chart,
 )
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.questionnaire import BasalAdjustment, QuestionnaireModel
-from dia_run.data_models.schemas import PatternAggregateSchema, PatternFeaturesSchema
+from dia_run.data_models.schemas import PatternAggregateSchema
 from dia_run.data_processing.data_processing import (
     DataProcessor,
     _compute_basal_lead_time,
@@ -24,47 +23,75 @@ from dia_run.data_processing.data_processing import (
 )
 
 
-class TestPatternFeaturesBuild:
-    def test_get_pattern_features_validates(self, *, test_data_paths: DataPaths) -> None:
+class TestActivityOutcomes:
+    def test_outcomes_contains_all_activities(self, *, test_data_paths: DataPaths) -> None:
         processor = DataProcessor(test_data_paths)
-        df = processor.get_pattern_features()
-
-        PatternFeaturesSchema.validate(df)
-        assert len(df) == 4
+        df = processor._get_activity_outcomes()  # noqa: SLF001
         assert set(df["activity_id"].to_list()) == {1001, 1002, 1003, 1004}
+        assert {"tir_pct", "good_finish_flag", "low_event_flag", "run_variability_p90_p10"} <= set(df.columns)
 
-    def test_pattern_features_is_cached(self, *, test_data_paths: DataPaths) -> None:
+    def test_outcomes_is_cached(self, *, test_data_paths: DataPaths) -> None:
         processor = DataProcessor(test_data_paths)
-        first = processor.get_pattern_features()
-        second = processor.get_pattern_features()
-        assert first.equals(second)
+        first = processor._get_activity_outcomes()  # noqa: SLF001
+        second = processor._get_activity_outcomes()  # noqa: SLF001
+        assert first is second
 
-    def test_activity_without_questionnaire_has_none_bucket(self, *, test_data_paths: DataPaths) -> None:
-        processor = DataProcessor(test_data_paths)
-        df = processor.get_pattern_features()
-        row = df.filter(pl.col("activity_id") == 1001).row(0, named=True)
-        assert row["basal_lead_time_bucket"] == "none"
-        assert row["basal_lead_time_min"] is None
-        assert row["total_carbohydrates_g"] is None
 
-    def test_basal_lead_time_resolved_from_questionnaire(self, *, test_data_paths: DataPaths) -> None:
+class TestTimeOfDayBuckets:
+    def test_bucket_assignment(self, *, test_data_paths: DataPaths) -> None:
         processor = DataProcessor(test_data_paths)
-        df = processor.get_pattern_features()
-        row_1002 = df.filter(pl.col("activity_id") == 1002).row(0, named=True)
-        assert row_1002["basal_lead_time_min"] == 10
-        assert row_1002["basal_lead_time_bucket"] == "0-15"
-        row_1004 = df.filter(pl.col("activity_id") == 1004).row(0, named=True)
-        assert row_1004["basal_lead_time_min"] == 30
-        assert row_1004["basal_lead_time_bucket"] == "16-30"
-
-    def test_time_of_day_bucket_assignment(self, *, test_data_paths: DataPaths) -> None:
-        processor = DataProcessor(test_data_paths)
-        df = processor.get_pattern_features()
+        df = processor._get_time_of_day_buckets()  # noqa: SLF001
         buckets = dict(zip(df["activity_id"].to_list(), df["time_of_day_bucket"].to_list(), strict=True))
-        assert buckets[1001] == "before_noon"
-        assert buckets[1002] == "after_noon"
-        assert buckets[1003] == "after_noon"
-        assert buckets[1004] == "before_noon"
+        assert buckets[1001] == "morning"  # 10:00
+        assert buckets[1002] == "evening"  # 18:00
+        assert buckets[1003] is None  # 14:00 — off window (12-15)
+        assert buckets[1004] == "morning"  # 08:00
+
+    def test_off_window_excluded_from_outcomes(self, *, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        outcomes = processor.get_time_of_day_outcomes()
+        # Activity 1003 is off-window so the aggregation should only cover 1001/1002/1004
+        assert outcomes["n"].sum() == 3
+
+
+class TestStable20Flags:
+    def test_flags_cover_all_activities(self, *, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        df = processor._get_stable_20_flags()  # noqa: SLF001
+        assert set(df["activity_id"].to_list()) == {1001, 1002, 1003, 1004}
+        assert df.schema["stable_20_flag"] == pl.Boolean
+
+    def test_is_cached(self, *, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        first = processor._get_stable_20_flags()  # noqa: SLF001
+        second = processor._get_stable_20_flags()  # noqa: SLF001
+        assert first is second
+
+
+class TestSg20Bins:
+    def test_bins_values(self, *, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        df = processor._get_sg_20_bins()  # noqa: SLF001
+        assert set(df["activity_id"].to_list()) == {1001, 1002, 1003, 1004}
+        bins = set(df["sg_20_bin"].drop_nulls().to_list())
+        assert bins <= {"<100", "100-129", "130-159", "160-180", ">180"}
+
+    def test_is_cached(self, *, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        first = processor._get_sg_20_bins()  # noqa: SLF001
+        second = processor._get_sg_20_bins()  # noqa: SLF001
+        assert first is second
+
+
+class TestBasalLeadTimeBuckets:
+    def test_buckets_from_fixture(self, *, test_data_paths: DataPaths) -> None:
+        processor = DataProcessor(test_data_paths)
+        df = processor._get_basal_lead_time_buckets()  # noqa: SLF001
+        buckets = dict(zip(df["activity_id"].to_list(), df["basal_lead_time_bucket"].to_list(), strict=True))
+        assert buckets[1001] == "none"  # no questionnaire adjustments
+        assert buckets[1002] == "0-30"  # lead_time=10 → "0-30"
+        assert buckets[1003] == "none"  # no adjustments
+        assert buckets[1004] == "0-30"  # lead_time=30 → "0-30"
 
 
 class TestDurationBand:
@@ -139,14 +166,14 @@ class TestBasalLeadTime:
     @pytest.mark.parametrize(
         ("start_time_min", "expected_bucket"),
         [
-            (-1, "0-15"),
-            (-15, "0-15"),
-            (-16, "16-30"),
-            (-30, "16-30"),
+            (-1, "0-30"),
+            (-30, "0-30"),
             (-31, "31-60"),
             (-60, "31-60"),
-            (-61, ">60"),
-            (-120, ">60"),
+            (-61, "61-90"),
+            (-90, "61-90"),
+            (-91, ">90"),
+            (-120, ">90"),
         ],
     )
     def test_bucket_boundaries(self, *, start_time_min: int, expected_bucket: str) -> None:
@@ -219,10 +246,7 @@ class TestAggregators:
 
         PatternAggregateSchema.validate(result)
         assert set(result["bucket_dim"].unique().to_list()) == {"time_of_day"}
-        assert set(result["bucket_key"].to_list()) <= {"before_noon", "after_noon"}
-
-        features = processor.get_pattern_features()
-        assert result["n"].sum() == len(features)
+        assert set(result["bucket_key"].to_list()) <= {"morning", "evening"}
         assert (result["actionable"] == (result["n"] >= 8)).all()
 
     def test_first20_stability_effect_drops_null_flags(self, *, test_data_paths: DataPaths) -> None:
@@ -239,7 +263,7 @@ class TestAggregators:
 
         PatternAggregateSchema.validate(result)
         assert set(result["bucket_dim"].unique().to_list()) <= {"basal_lead_time"}
-        allowed = {"none", "0-15", "16-30", "31-60", ">60"}
+        allowed = {"none", "0-30", "31-60", "61-90", ">90"}
         assert set(result["bucket_key"].to_list()) <= allowed
 
     def test_sg20_predictor_drops_null_bins(self, *, test_data_paths: DataPaths) -> None:
@@ -264,7 +288,6 @@ class TestPatternInsightChartsSmoke:
         "builder",
         [
             create_time_of_day_outcomes_chart,
-            create_time_of_day_pre_run_profile_chart,
             create_first20_stability_effect_chart,
             create_basal_lead_time_effect_chart,
             create_sg20_predictor_chart,

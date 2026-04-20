@@ -25,7 +25,6 @@ from dia_run.dashboard.charts.pattern_insights import (
     create_sg20_predictor_chart,
     create_similar_runs_benchmark_chart,
     create_time_of_day_outcomes_chart,
-    create_time_of_day_pre_run_profile_chart,
 )
 from dia_run.dashboard.charts.run_types import (
     create_run_type_distance_chart,
@@ -148,9 +147,6 @@ class OverviewPageService:
             ),
             "time_of_day_outcomes": render_plotly_figure(
                 figure=create_time_of_day_outcomes_chart(data_processor=data_processor),
-            ),
-            "time_of_day_pre_run_profile": render_plotly_figure(
-                figure=create_time_of_day_pre_run_profile_chart(data_processor=data_processor),
             ),
             "first20_stability_effect": render_plotly_figure(
                 figure=create_first20_stability_effect_chart(data_processor=data_processor),

@@ -96,58 +96,6 @@ def create_time_of_day_outcomes_chart(*, data_processor: DataProcessor) -> go.Fi
     return fig
 
 
-def create_time_of_day_pre_run_profile_chart(*, data_processor: DataProcessor) -> go.Figure:
-    df = data_processor.get_pattern_features()
-    if df.is_empty():
-        fig = go.Figure()
-        fig.update_layout(**get_empty_chart_layout(title="Pre-run profile by time of day", message="No runs available"))
-        return fig
-
-    panels = [
-        ("Insulin on board (U)", "insulin_on_board_in_going"),
-        ("Pre-run carbs (g)", "total_carbohydrates_g"),
-        ("Pre-run bolus (%)", "avg_bolus_percentage"),
-        ("Earliest intake (min before start)", "earliest_time_before_start_min"),
-    ]
-
-    counts = {bucket: 0 for bucket in _TIME_OF_DAY_ORDER}
-    for bucket in _TIME_OF_DAY_ORDER:
-        counts[bucket] = int(df.filter(pl.col("time_of_day_bucket") == bucket).height)
-
-    subplot_titles = [f"{title} (n={counts['before_noon']} am / {counts['after_noon']} pm)" for title, _ in panels]
-    fig = make_subplots(rows=2, cols=2, subplot_titles=subplot_titles, horizontal_spacing=0.12, vertical_spacing=0.18)
-
-    for idx, (_, column) in enumerate(panels):
-        row = idx // 2 + 1
-        col = idx % 2 + 1
-        for bucket_idx, bucket in enumerate(_TIME_OF_DAY_ORDER):
-            values = df.filter(pl.col("time_of_day_bucket") == bucket)[column].drop_nulls().to_list()
-            color = MAIN_COLOR if bucket == "before_noon" else MAIN_COLOR_SHADE_300
-            fig.add_trace(
-                go.Box(
-                    name=_TIME_OF_DAY_LABELS[bucket],
-                    y=values,
-                    marker={"color": color, "size": 6, "opacity": 0.8},
-                    line={"color": color, "width": 1.8},
-                    showlegend=idx == 0,
-                    legendgroup=bucket,
-                    boxpoints="outliers",
-                ),
-                row=row,
-                col=col,
-            )
-            _ = bucket_idx
-
-    layout = get_default_layout(
-        title="Pre-run profile by time of day",
-        height=520,
-        showlegend=True,
-    )
-    layout["legend"] = get_bottom_legend(y=-0.1)
-    fig.update_layout(**layout)
-    return fig
-
-
 def create_first20_stability_effect_chart(*, data_processor: DataProcessor) -> go.Figure:
     df = data_processor.get_first20_stability_effect()
     if df.is_empty():
