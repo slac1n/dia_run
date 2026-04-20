@@ -1,6 +1,8 @@
+import plotly.graph_objects as go
 import polars as pl
 import pytest
 
+from dia_run.dashboard.charts.fueling_impact import create_fueling_sg_chart, create_fueling_timing_chart
 from dia_run.data_models.paths import DataPaths
 from dia_run.data_models.schemas import FUELING_TIMING_BUCKETS, GLUCOSE_BANDS, FuelingTimingAggregateSchema
 from dia_run.data_processing.data_processing import DataProcessor, _compute_fueling_timing_bucket
@@ -96,3 +98,11 @@ class TestFuelingAggregators:
         result = processor.get_fueling_timing_effect()
         events = processor._compute_fueling_event_metrics()  # noqa: SLF001
         assert result["n"].sum() == events.drop_nulls("time_into_run_bucket").height
+
+
+class TestFuelingChartSmoke:
+    @pytest.mark.parametrize("builder", [create_fueling_timing_chart, create_fueling_sg_chart])
+    def test_builder_returns_figure(self, *, test_data_paths: DataPaths, builder) -> None:  # type: ignore[no-untyped-def]
+        processor = DataProcessor(test_data_paths)
+        fig = builder(data_processor=processor)
+        assert isinstance(fig, go.Figure)

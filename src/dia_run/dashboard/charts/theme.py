@@ -163,6 +163,21 @@ def get_horizontal_colorbar(*, title: str, y: float = -0.28) -> dict[str, Any]:
     }
 
 
+def get_exploratory_marker(*, n_values: list[int], base_color: str, threshold: int = 8) -> dict[str, Any]:
+    """Marker dict that marks low-n buckets with reduced opacity and a hatched pattern.
+
+    Shared across aggregated charts so exploratory-vs-actionable styling stays consistent.
+    """
+    opacities = [1.0 if n >= threshold else 0.45 for n in n_values]
+    patterns = ["" if n >= threshold else "/" for n in n_values]
+    return {
+        "color": base_color,
+        "opacity": opacities,
+        "line": {"width": 1, "color": MAIN_COLOR},
+        "pattern": {"shape": patterns, "solidity": 0.35, "fgcolor": "#ffffff"},
+    }
+
+
 def get_color_for_index(index: int) -> str:
     """Get a chart color by index, cycling through the palette.
 

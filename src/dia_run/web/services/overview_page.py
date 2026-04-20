@@ -6,7 +6,10 @@ from loguru import logger
 from markupsafe import Markup
 
 from dia_run.dashboard.charts.activity_calendar import create_activity_calendar_chart
-from dia_run.dashboard.charts.basal_adjustment_impact import create_basal_adjustment_tir_chart
+from dia_run.dashboard.charts.basal_adjustment_impact import (
+    create_basal_adjustment_tir_chart,
+    create_basal_lead_time_effect_chart,
+)
 from dia_run.dashboard.charts.diabetes_management import (
     create_in_going_out_going_sensor_glucose_chart,
     create_insulin_on_board_and_normalized_glucose_change_chart,
@@ -20,7 +23,6 @@ from dia_run.dashboard.charts.fueling_impact import (
     create_fueling_glucose_response_chart,
 )
 from dia_run.dashboard.charts.pattern_insights import (
-    create_basal_lead_time_effect_chart,
     create_first20_stability_effect_chart,
     create_sg20_predictor_chart,
     create_similar_runs_benchmark_chart,

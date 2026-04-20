@@ -5,8 +5,8 @@ import plotly.graph_objects as go
 import polars as pl
 import pytest
 
+from dia_run.dashboard.charts.basal_adjustment_impact import create_basal_lead_time_effect_chart
 from dia_run.dashboard.charts.pattern_insights import (
-    create_basal_lead_time_effect_chart,
     create_first20_stability_effect_chart,
     create_sg20_predictor_chart,
     create_similar_runs_benchmark_chart,
