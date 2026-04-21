@@ -48,6 +48,7 @@ def dashboard(
         {"label": "Pre-run", "href": "#pre-run"},
         {"label": "Mid-run", "href": "#mid-run"},
         {"label": "Basal", "href": "#basal"},
+        {"label": "Patterns", "href": "#pattern-insights"},
     ]
 
     page_links = [

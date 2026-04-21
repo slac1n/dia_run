@@ -6,7 +6,10 @@ from loguru import logger
 from markupsafe import Markup
 
 from dia_run.dashboard.charts.activity_calendar import create_activity_calendar_chart
-from dia_run.dashboard.charts.basal_adjustment_impact import create_basal_adjustment_tir_chart
+from dia_run.dashboard.charts.basal_adjustment_impact import (
+    create_basal_adjustment_tir_chart,
+    create_basal_lead_time_effect_chart,
+)
 from dia_run.dashboard.charts.diabetes_management import (
     create_in_going_out_going_sensor_glucose_chart,
     create_insulin_on_board_and_normalized_glucose_change_chart,
@@ -18,6 +21,14 @@ from dia_run.dashboard.charts.diabetes_management import (
 from dia_run.dashboard.charts.fueling_impact import (
     create_fueling_carbs_vs_peak_chart,
     create_fueling_glucose_response_chart,
+    create_fueling_sg_chart,
+    create_fueling_timing_chart,
+)
+from dia_run.dashboard.charts.pattern_insights import (
+    create_first20_stability_effect_chart,
+    create_sg20_predictor_chart,
+    create_similar_runs_benchmark_chart,
+    create_time_of_day_outcomes_chart,
 )
 from dia_run.dashboard.charts.run_types import (
     create_run_type_distance_chart,
@@ -135,8 +146,29 @@ class OverviewPageService:
             "fueling_carbs_peak": render_plotly_figure(
                 figure=create_fueling_carbs_vs_peak_chart(data_processor=data_processor),
             ),
+            "fueling_timing_effect": render_plotly_figure(
+                figure=create_fueling_timing_chart(data_processor=data_processor),
+            ),
+            "fueling_sg_effect": render_plotly_figure(
+                figure=create_fueling_sg_chart(data_processor=data_processor),
+            ),
             "basal_adjustment_tir": render_plotly_figure(
                 figure=create_basal_adjustment_tir_chart(data_processor=data_processor),
+            ),
+            "time_of_day_outcomes": render_plotly_figure(
+                figure=create_time_of_day_outcomes_chart(data_processor=data_processor),
+            ),
+            "first20_stability_effect": render_plotly_figure(
+                figure=create_first20_stability_effect_chart(data_processor=data_processor),
+            ),
+            "basal_lead_time_effect": render_plotly_figure(
+                figure=create_basal_lead_time_effect_chart(data_processor=data_processor),
+            ),
+            "sg20_predictor": render_plotly_figure(
+                figure=create_sg20_predictor_chart(data_processor=data_processor),
+            ),
+            "similar_runs_benchmark": render_plotly_figure(
+                figure=create_similar_runs_benchmark_chart(data_processor=data_processor),
             ),
         }
 

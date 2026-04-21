@@ -131,3 +131,35 @@ class FuelingImpactSchema(DataFrameModel):
     peak_increase: Series[float] = Field(nullable=True)
     time_to_peak_min: Series[float] = Field(nullable=True)
     name_date: Series[str]
+
+
+TIME_OF_DAY_BUCKETS = ["morning", "evening"]
+DURATION_BANDS = ["<=45", "46-75", "76-120", ">120"]
+GLUCOSE_BANDS = ["<100", "100-129", "130-159", "160-180", ">180"]
+BASAL_LEAD_TIME_BUCKETS = ["none", "0-30", "31-60", "61-90", ">90"]
+FUELING_TIMING_BUCKETS = ["0-15", "16-30", "31-60", "61-90", ">90"]
+PATTERN_AGGREGATE_DIMS = ["time_of_day", "stability", "basal_lead_time", "sg20", "cohort"]
+FUELING_AGGREGATE_DIMS = ["fueling_time", "fueling_sg"]
+
+
+class PatternAggregateSchema(DataFrameModel):
+    bucket_key: Series[str]
+    bucket_dim: Series[str] = Field(isin=PATTERN_AGGREGATE_DIMS)
+    n: Series[int] = Field(ge=0)
+    tir_median: Series[float] = Field(nullable=True, ge=0, le=100)
+    tir_mean: Series[float] = Field(nullable=True, ge=0, le=100)
+    low_event_rate: Series[float] = Field(nullable=True, ge=0, le=1)
+    good_finish_rate: Series[float] = Field(nullable=True, ge=0, le=1)
+    stable_20_rate: Series[float] = Field(nullable=True, ge=0, le=1)
+    variability_median: Series[float] = Field(nullable=True, ge=0)
+    actionable: Series[bool]
+
+
+class FuelingTimingAggregateSchema(DataFrameModel):
+    bucket_key: Series[str]
+    bucket_dim: Series[str] = Field(isin=FUELING_AGGREGATE_DIMS)
+    n: Series[int] = Field(ge=0)
+    post_tir_rate: Series[float] = Field(nullable=True, ge=0, le=1)
+    avoided_low_rate: Series[float] = Field(nullable=True, ge=0, le=1)
+    peak_no_spike_rate: Series[float] = Field(nullable=True, ge=0, le=1)
+    actionable: Series[bool]

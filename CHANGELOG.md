@@ -1,3 +1,24 @@
+## v0.30.0 (2026-04-21)
+
+### Feat
+
+- wire fueling timing/SG charts and relocate basal lead-time card
+- relabel pattern charts and add fueling timing/SG charts
+- add fueling timing and SG aggregators
+- wire pattern insights section into dashboard
+- add pattern insights chart module
+- add pattern insights aggregator methods
+- add pattern features table and schemas
+
+### Fix
+
+- move n= counts into x-axis labels on grouped bar charts
+
+### Refactor
+
+- rename peak_in_range to peak_no_spike
+- split pattern features into per-analysis helpers
+
 ## v0.29.0 (2026-04-15)
 
 ### Feat
