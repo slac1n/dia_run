@@ -351,8 +351,8 @@ def _build_fueling_side_by_side(
         fig.update_layout(**get_empty_chart_layout(title=title, message=empty_message))
         return fig
 
-    labels = df["bucket_key"].to_list()
     n_values = df["n"].to_list()
+    labels = [f"{k}<br>n={n}" for k, n in zip(df["bucket_key"].to_list(), n_values, strict=True)]
 
     metrics = [
         ("Post-TIR", [_pct(v) for v in df["post_tir_rate"].to_list()], MAIN_COLOR),
@@ -368,8 +368,6 @@ def _build_fueling_side_by_side(
                 x=labels,
                 y=values,
                 marker=get_exploratory_marker(n_values=n_values, base_color=color, threshold=ACTIONABLE_THRESHOLD),
-                text=[f"n={n}" for n in n_values],
-                textposition="outside",
                 hovertemplate=f"<b>{name}</b><br>%{{x}}<br>Value: %{{y:.1f}}%<br>n=%{{customdata}}<extra></extra>",
                 customdata=n_values,
             )

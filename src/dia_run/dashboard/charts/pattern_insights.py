@@ -46,8 +46,10 @@ def create_time_of_day_outcomes_chart(*, data_processor: DataProcessor) -> go.Fi
         return fig
 
     df = _sort_by_order(df, order=_TIME_OF_DAY_ORDER)
-    labels = [_TIME_OF_DAY_LABELS.get(k, k) for k in df["bucket_key"].to_list()]
     n_values = df["n"].to_list()
+    labels = [
+        f"{_TIME_OF_DAY_LABELS.get(k, k)} (n={n})" for k, n in zip(df["bucket_key"].to_list(), n_values, strict=True)
+    ]
 
     metrics = [
         ("TIR", df["tir_median"].to_list(), MAIN_COLOR),
@@ -63,8 +65,6 @@ def create_time_of_day_outcomes_chart(*, data_processor: DataProcessor) -> go.Fi
                 x=labels,
                 y=values,
                 marker=get_exploratory_marker(n_values=n_values, base_color=color, threshold=ACTIONABLE_THRESHOLD),
-                text=[f"n={n}" for n in n_values],
-                textposition="outside",
                 hovertemplate=f"<b>{name}</b><br>%{{x}}<br>Value: %{{y:.1f}}%<br>n=%{{customdata}}<extra></extra>",
                 customdata=n_values,
             )
@@ -117,8 +117,6 @@ def create_first20_stability_effect_chart(*, data_processor: DataProcessor) -> g
                 x=labels,
                 y=values,
                 marker=get_exploratory_marker(n_values=n_values, base_color=color, threshold=ACTIONABLE_THRESHOLD),
-                text=[f"n={n}" for n in n_values],
-                textposition="outside",
                 hovertemplate=f"<b>{name}</b><br>%{{x}}<br>Value: %{{y:.1f}}<br>n=%{{customdata}}<extra></extra>",
                 customdata=n_values,
             )
