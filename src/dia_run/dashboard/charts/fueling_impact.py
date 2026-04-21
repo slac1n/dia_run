@@ -352,7 +352,7 @@ def _build_fueling_side_by_side(
         return fig
 
     n_values = df["n"].to_list()
-    labels = [f"{k}<br>n={n}" for k, n in zip(df["bucket_key"].to_list(), n_values, strict=True)]
+    labels = [f"{k}<br>(n={n})" for k, n in zip(df["bucket_key"].to_list(), n_values, strict=True)]
 
     metrics = [
         ("Post-TIR", [_pct(v) for v in df["post_tir_rate"].to_list()], MAIN_COLOR),
