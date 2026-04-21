@@ -4,14 +4,22 @@ import polars as pl
 
 from dia_run.dashboard.charts.theme import (
     COLOR_MUTED,
+    MAIN_COLOR,
+    MAIN_COLOR_SHADE_300,
     MAIN_COLOR_SHADE_500,
     NAVY,
     SANDY,
     TOMATO,
+    get_bottom_legend,
     get_default_layout,
     get_empty_chart_layout,
+    get_exploratory_marker,
 )
 from dia_run.data_processing.data_processing import DataProcessor
+
+ACTIONABLE_THRESHOLD = 8
+_FUELING_TIMING_ORDER = ["0-15", "16-30", "31-60", "61-90", ">90"]
+_GLUCOSE_BAND_ORDER = ["<100", "100-129", "130-159", "160-180", ">180"]
 
 
 def _add_event_annotation(*, fig: go.Figure, x_value: int, text: str, color: str) -> None:
@@ -310,3 +318,92 @@ def create_fueling_carbs_vs_peak_chart(*, data_processor: DataProcessor) -> go.F
     fig.update_layout(**layout)
 
     return fig
+
+
+def _sort_by_order(df: pl.DataFrame, *, order: list[str]) -> pl.DataFrame:
+    order_map = {key: idx for idx, key in enumerate(order)}
+    return (
+        df.with_columns(
+            pl.col("bucket_key")
+            .replace_strict(order_map, default=len(order_map), return_dtype=pl.Int64)
+            .alias("_order_key")
+        )
+        .sort("_order_key")
+        .drop("_order_key")
+    )
+
+
+def _pct(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return round(value * 100, 1)
+
+
+def _build_fueling_side_by_side(
+    *,
+    df: pl.DataFrame,
+    title: str,
+    xaxis_title: str,
+    empty_message: str,
+) -> go.Figure:
+    if df.is_empty():
+        fig = go.Figure()
+        fig.update_layout(**get_empty_chart_layout(title=title, message=empty_message))
+        return fig
+
+    n_values = df["n"].to_list()
+    labels = [f"{k}<br>(n={n})" for k, n in zip(df["bucket_key"].to_list(), n_values, strict=True)]
+
+    metrics = [
+        ("Post-TIR", [_pct(v) for v in df["post_tir_rate"].to_list()], MAIN_COLOR),
+        ("Avoided low", [_pct(v) for v in df["avoided_low_rate"].to_list()], MAIN_COLOR_SHADE_500),
+        ("No spike", [_pct(v) for v in df["peak_no_spike_rate"].to_list()], MAIN_COLOR_SHADE_300),
+    ]
+
+    fig = go.Figure()
+    for name, values, color in metrics:
+        fig.add_trace(
+            go.Bar(
+                name=name,
+                x=labels,
+                y=values,
+                marker=get_exploratory_marker(n_values=n_values, base_color=color, threshold=ACTIONABLE_THRESHOLD),
+                hovertemplate=f"<b>{name}</b><br>%{{x}}<br>Value: %{{y:.1f}}%<br>n=%{{customdata}}<extra></extra>",
+                customdata=n_values,
+            )
+        )
+
+    layout = get_default_layout(
+        title=title,
+        xaxis_title=xaxis_title,
+        yaxis_title="Rate [%]",
+        height=420,
+        showlegend=True,
+    )
+    layout["barmode"] = "group"
+    layout["legend"] = get_bottom_legend()
+    fig.update_layout(**layout)
+    fig.update_yaxes(range=[0, 110])
+    return fig
+
+
+def create_fueling_timing_chart(*, data_processor: DataProcessor) -> go.Figure:
+    df = data_processor.get_fueling_timing_effect()
+    df = _sort_by_order(df, order=_FUELING_TIMING_ORDER)
+    return _build_fueling_side_by_side(
+        df=df,
+        title="Best time to fuel during the run",
+        xaxis_title="Minutes into run",
+        empty_message="No fueling events available",
+    )
+
+
+def create_fueling_sg_chart(*, data_processor: DataProcessor) -> go.Figure:
+    df = data_processor.get_fueling_sg_effect()
+    df = _sort_by_order(df, order=_GLUCOSE_BAND_ORDER)
+    return _build_fueling_side_by_side(
+        df=df,
+        title="Best SG level when fueling",
+        xaxis_title="SG at fueling [mg/dL]",
+        empty_message="No fueling events with baseline SG",
+    )

@@ -125,6 +125,14 @@
       <h3>Carbs vs peak increase</h3>
       <div class="chart-embed" data-plot-kind="fueling_carbs_peak">{{ charts.fueling_carbs_peak }}</div>
     </div>
+    <div class="chart-card">
+      <h3>Best time to fuel during the run</h3>
+      <div class="chart-embed" data-plot-kind="fueling_timing_effect">{{ charts.fueling_timing_effect }}</div>
+    </div>
+    <div class="chart-card">
+      <h3>Best SG level when fueling</h3>
+      <div class="chart-embed" data-plot-kind="fueling_sg_effect">{{ charts.fueling_sg_effect }}</div>
+    </div>
   </div>
 </section>
 
@@ -140,6 +148,38 @@
     <div class="chart-card chart-card--full">
       <h3>Time in range during basal adjustments</h3>
       <div class="chart-embed" data-plot-kind="basal_adjustment_tir">{{ charts.basal_adjustment_tir }}</div>
+    </div>
+    <div class="chart-card chart-card--full">
+      <h3>Basal lead-time vs TIR and early stability</h3>
+      <div class="chart-embed" data-plot-kind="basal_lead_time_effect">{{ charts.basal_lead_time_effect }}</div>
+    </div>
+  </div>
+</section>
+
+<section id="pattern-insights" class="section">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Pattern insights</p>
+      <h2>What predicts a good run</h2>
+    </div>
+    <p class="section-note"><strong>Stable first 20 min</strong>: CGM stays in 100-180 mg/dL and within 20 mg/dL of start. <strong>Good finish</strong>: final reading in 100-180 mg/dL. Buckets with n&lt;8 are exploratory.</p>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h3>Outcomes by time of day</h3>
+      <div class="chart-embed" data-plot-kind="time_of_day_outcomes">{{ charts.time_of_day_outcomes }}</div>
+    </div>
+    <div class="chart-card">
+      <h3>First 20 min: stability impact</h3>
+      <div class="chart-embed" data-plot-kind="first20_stability_effect">{{ charts.first20_stability_effect }}</div>
+    </div>
+    <div class="chart-card">
+      <h3>Glucose at +20 min as predictor</h3>
+      <div class="chart-embed" data-plot-kind="sg20_predictor">{{ charts.sg20_predictor }}</div>
+    </div>
+    <div class="chart-card chart-card--full">
+      <h3>Similar-runs benchmark</h3>
+      <div class="chart-embed" data-plot-kind="similar_runs_benchmark">{{ charts.similar_runs_benchmark }}</div>
     </div>
   </div>
 </section>

@@ -267,6 +267,31 @@ classDiagram
         +float tir_pct
     }
 
+    class PatternAggregateSchema {
+        <<DataFrameModel>>
+        +str bucket_key
+        +str bucket_dim
+        +int n
+        +float tir_median
+        +float tir_mean
+        +float low_event_rate
+        +float good_finish_rate
+        +float stable_20_rate
+        +float variability_median
+        +bool actionable
+    }
+
+    class FuelingTimingAggregateSchema {
+        <<DataFrameModel>>
+        +str bucket_key
+        +str bucket_dim
+        +int n
+        +float post_tir_rate
+        +float avoided_low_rate
+        +float peak_no_spike_rate
+        +bool actionable
+    }
+
     SummarySchema --|> StravaSummarySchema
     HeartrateStreamsSchema --|> StreamsSchema
     GlucoseStreamsSchema --|> StreamsSchema
@@ -290,6 +315,13 @@ classDiagram
         +get_fueling_glucose_windows() DataFrame~FuelingGlucoseWindowSchema~
         +get_fueling_impact() DataFrame~FuelingImpactSchema~
         +get_basal_adjustment_tir() DataFrame~BasalAdjustmentTirSchema~
+        +get_time_of_day_outcomes() DataFrame~PatternAggregateSchema~
+        +get_first20_stability_effect() DataFrame~PatternAggregateSchema~
+        +get_basal_lead_time_effect() DataFrame~PatternAggregateSchema~
+        +get_sg20_predictor() DataFrame~PatternAggregateSchema~
+        +get_similar_runs_cohorts() DataFrame~PatternAggregateSchema~
+        +get_fueling_timing_effect() DataFrame~FuelingTimingAggregateSchema~
+        +get_fueling_sg_effect() DataFrame~FuelingTimingAggregateSchema~
     }
 
     DataProcessor --> DataPaths
@@ -304,6 +336,8 @@ classDiagram
     DataProcessor ..> FuelingGlucoseWindowSchema : returns
     DataProcessor ..> FuelingImpactSchema : returns
     DataProcessor ..> BasalAdjustmentTirSchema : returns
+    DataProcessor ..> PatternAggregateSchema : returns
+    DataProcessor ..> FuelingTimingAggregateSchema : returns
 
     class DashboardOverviewData {
         +DataFrame summary
@@ -425,6 +459,8 @@ classDiagram
         <<module>>
         +create_fueling_glucose_response_chart(data_processor) Figure
         +create_fueling_carbs_vs_peak_chart(data_processor) Figure
+        +create_fueling_timing_chart(data_processor) Figure
+        +create_fueling_sg_chart(data_processor) Figure
     }
 
     class ActivityCalendarCharts {
@@ -435,6 +471,15 @@ classDiagram
     class BasalAdjustmentImpactCharts {
         <<module>>
         +create_basal_adjustment_tir_chart(data_processor) Figure
+        +create_basal_lead_time_effect_chart(data_processor) Figure
+    }
+
+    class PatternInsightsCharts {
+        <<module>>
+        +create_time_of_day_outcomes_chart(data_processor) Figure
+        +create_first20_stability_effect_chart(data_processor) Figure
+        +create_sg20_predictor_chart(data_processor) Figure
+        +create_similar_runs_benchmark_chart(data_processor) Figure
     }
 
     SingleActivityCharts ..> DataProcessor
@@ -444,6 +489,7 @@ classDiagram
     FuelingImpactCharts ..> DataProcessor
     ActivityCalendarCharts ..> Calendar
     BasalAdjustmentImpactCharts ..> DataProcessor
+    PatternInsightsCharts ..> DataProcessor
 
     %% ──────────────────────────────────────────────
     %% Web – FastAPI Application
