@@ -36,7 +36,7 @@ class TestFuelingEventMetrics:
         # Activity 1002: 1 fueling; activity 1003: 2 fuelings; activity 1004: 2 fuelings = 5 events
         assert len(df) == 5
         assert {"activity_id", "fueling_index", "time_into_run_bucket", "sg_at_fueling_band"} <= set(df.columns)
-        assert {"post_tir_rate", "avoided_low", "peak_in_range"} <= set(df.columns)
+        assert {"post_tir_rate", "avoided_low", "peak_no_spike"} <= set(df.columns)
 
     def test_time_into_run_buckets_are_in_canonical_set(self, *, test_data_paths: DataPaths) -> None:
         processor = DataProcessor(test_data_paths)
@@ -48,16 +48,16 @@ class TestFuelingEventMetrics:
         df = processor._compute_fueling_event_metrics()  # noqa: SLF001
         assert set(df["sg_at_fueling_band"].drop_nulls().to_list()) <= set(GLUCOSE_BANDS)
 
-    def test_peak_in_range_follows_peak_sg(self, *, test_data_paths: DataPaths) -> None:
+    def test_peak_no_spike_follows_peak_sg(self, *, test_data_paths: DataPaths) -> None:
         processor = DataProcessor(test_data_paths)
         metrics = processor._compute_fueling_event_metrics()  # noqa: SLF001
         impact = processor.get_fueling_impact()
         merged = metrics.join(impact, on=["activity_id", "fueling_index"], how="inner")
         for row in merged.iter_rows(named=True):
             if row["peak_sg"] is None:
-                assert row["peak_in_range"] is None
+                assert row["peak_no_spike"] is None
             else:
-                assert row["peak_in_range"] == (row["peak_sg"] <= 180)
+                assert row["peak_no_spike"] == (row["peak_sg"] <= 180)
 
     def test_avoided_low_consistent_with_post_window_values(self, *, test_data_paths: DataPaths) -> None:
         processor = DataProcessor(test_data_paths)

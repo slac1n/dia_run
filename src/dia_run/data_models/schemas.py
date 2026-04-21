@@ -161,5 +161,5 @@ class FuelingTimingAggregateSchema(DataFrameModel):
     n: Series[int] = Field(ge=0)
     post_tir_rate: Series[float] = Field(nullable=True, ge=0, le=1)
     avoided_low_rate: Series[float] = Field(nullable=True, ge=0, le=1)
-    peak_in_range_rate: Series[float] = Field(nullable=True, ge=0, le=1)
+    peak_no_spike_rate: Series[float] = Field(nullable=True, ge=0, le=1)
     actionable: Series[bool]

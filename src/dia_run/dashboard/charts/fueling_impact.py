@@ -357,7 +357,7 @@ def _build_fueling_side_by_side(
     metrics = [
         ("Post-TIR", [_pct(v) for v in df["post_tir_rate"].to_list()], MAIN_COLOR),
         ("Avoided low", [_pct(v) for v in df["avoided_low_rate"].to_list()], MAIN_COLOR_SHADE_500),
-        ("Peak in range", [_pct(v) for v in df["peak_in_range_rate"].to_list()], MAIN_COLOR_SHADE_300),
+        ("No spike", [_pct(v) for v in df["peak_no_spike_rate"].to_list()], MAIN_COLOR_SHADE_300),
     ]
 
     fig = go.Figure()

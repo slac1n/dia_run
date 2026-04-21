@@ -127,7 +127,7 @@ _FUELING_AGGREGATE_SCHEMA: dict[str, pl.DataType] = {
     "n": pl.Int64,
     "post_tir_rate": pl.Float64,
     "avoided_low_rate": pl.Float64,
-    "peak_in_range_rate": pl.Float64,
+    "peak_no_spike_rate": pl.Float64,
     "actionable": pl.Boolean,
 }
 
@@ -511,7 +511,7 @@ class DataProcessor:
                 )
                 avoided_low = bool((post_values >= TARGET_GLUCOSE_LOWER).all())
 
-            peak_in_range: bool | None = peak_sg <= TARGET_GLUCOSE_UPPER if peak_sg is not None else None
+            peak_no_spike: bool | None = peak_sg <= TARGET_GLUCOSE_UPPER if peak_sg is not None else None
 
             metric_rows.append(
                 {
@@ -521,7 +521,7 @@ class DataProcessor:
                     "sg_at_fueling_band": _compute_glucose_band(baseline_sg),
                     "post_tir_rate": post_tir_rate,
                     "avoided_low": avoided_low,
-                    "peak_in_range": peak_in_range,
+                    "peak_no_spike": peak_no_spike,
                 }
             )
 
@@ -534,7 +534,7 @@ class DataProcessor:
                 "sg_at_fueling_band": pl.Utf8,
                 "post_tir_rate": pl.Float64,
                 "avoided_low": pl.Boolean,
-                "peak_in_range": pl.Boolean,
+                "peak_no_spike": pl.Boolean,
             },
         )
         return self._fueling_event_metrics
@@ -559,7 +559,7 @@ class DataProcessor:
                 pl.len().cast(pl.Int64).alias("n"),
                 pl.col("post_tir_rate").mean().cast(pl.Float64).alias("post_tir_rate"),
                 pl.col("avoided_low").cast(pl.Float64).mean().alias("avoided_low_rate"),
-                pl.col("peak_in_range").cast(pl.Float64).mean().alias("peak_in_range_rate"),
+                pl.col("peak_no_spike").cast(pl.Float64).mean().alias("peak_no_spike_rate"),
             )
             .with_columns(pl.col(group_key).cast(pl.Utf8))
             .rename({group_key: "bucket_key"})
