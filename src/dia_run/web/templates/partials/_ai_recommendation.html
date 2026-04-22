@@ -1,0 +1,20 @@
+{% if recommendation %}
+<div class="ai-recommendation">
+  <div class="ai-recommendation__header">
+    <p class="eyebrow">AI recommendations</p>
+    <p class="ai-recommendation__meta">Ephemeral — not saved. Reload to clear.</p>
+  </div>
+  {% if recommendation_model %}
+  <p class="ai-recommendation__meta ai-recommendation__meta--run">
+    model: <code>{{ recommendation_model }}</code>
+    · reasoning effort: <code>{{ recommendation_reasoning_effort }}</code>
+  </p>
+  {% endif %}
+  <pre class="ai-recommendation__body">{{ recommendation }}</pre>
+</div>
+{% elif recommendation_error %}
+<div class="ai-recommendation ai-recommendation--error">
+  <p class="eyebrow">AI recommendations</p>
+  <p>Could not generate recommendations: {{ recommendation_error }}</p>
+</div>
+{% endif %}

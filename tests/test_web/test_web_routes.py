@@ -100,6 +100,63 @@ def test_activity_detail_shows_glucose_tiles(*, client: TestClient) -> None:
     assert "TIR" in response.text
 
 
+def test_activity_detail_shows_ai_recommendations_button(*, client: TestClient) -> None:
+    response = client.get("/activities/1001")
+    assert response.status_code == 200
+    assert "AI recommendations" in response.text
+    assert 'action="/activities/1001/recommendation"' in response.text
+
+
+def test_activity_recommendation_renders_response_at_top(
+    *, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _stub(*, run_context: str) -> str:  # noqa: ARG001
+        return "1. Do X at T-30.\n\n2. Do Y.\n\n3. Do Z."
+
+    monkeypatch.setattr("dia_run.web.routes.activities.request_recommendation", _stub)
+
+    response = client.post("/activities/1001/recommendation")
+
+    assert response.status_code == 200
+    body = response.text
+    assert "1. Do X at T-30." in body
+    assert body.index("1. Do X at T-30.") < body.index("Back to activities")
+
+
+def test_activity_recommendation_htmx_returns_fragment_only(
+    *, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _stub(*, run_context: str) -> str:  # noqa: ARG001
+        return "1. Do X at T-30."
+
+    monkeypatch.setattr("dia_run.web.routes.activities.request_recommendation", _stub)
+
+    response = client.post("/activities/1001/recommendation", headers={"HX-Request": "true"})
+
+    assert response.status_code == 200
+    body = response.text
+    assert "1. Do X at T-30." in body
+    assert "Back to activities" not in body
+    assert "<main" not in body
+
+
+def test_activity_recommendation_renders_error_when_api_fails(
+    *, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dia_run.llm.openrouter_client import OpenRouterError
+
+    def _raise(*, run_context: str) -> str:  # noqa: ARG001
+        raise OpenRouterError("OPENROUTER_API_KEY is not configured.")
+
+    monkeypatch.setattr("dia_run.web.routes.activities.request_recommendation", _raise)
+
+    response = client.post("/activities/1001/recommendation")
+
+    assert response.status_code == 200
+    assert "Could not generate recommendations" in response.text
+    assert "OPENROUTER_API_KEY is not configured." in response.text
+
+
 def test_dashboard_route_uses_cached_overview_context(*, client: TestClient, web_data_paths: DataPaths) -> None:
     service = get_overview_page_service(data_paths=web_data_paths)
     service.invalidate()
