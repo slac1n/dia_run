@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 
 {% block content %}
+<section class="section ai-recommendation-slot" id="ai-recommendation-slot">
+{%- if recommendation or recommendation_error -%}
+{%- include "partials/_ai_recommendation.html" -%}
+{%- endif -%}
+</section>
+
 <section class="section detail-header">
   <a class="back-link" href="/activities">Back to activities</a>
   <div class="section-header">
@@ -8,7 +14,23 @@
       <p class="eyebrow">Activity</p>
       <h1>{{ activity.name }}</h1>
     </div>
-    <p class="section-note">{{ activity.date }} | {{ activity.run_type }}</p>
+    <div class="detail-header__actions">
+      <p class="section-note">{{ activity.date }} | {{ activity.run_type }}</p>
+      <form id="ai-recommendation-form"
+            class="inline-form"
+            action="/activities/{{ activity.activity_id }}/recommendation"
+            method="post"
+            hx-post="/activities/{{ activity.activity_id }}/recommendation"
+            hx-target="#ai-recommendation-slot"
+            hx-swap="innerHTML"
+            hx-disabled-elt="find button">
+        <button class="button button--ai" type="submit">
+          <span class="button__label button__label--default">AI recommendations</span>
+          <span class="button__label button__label--loading">Thinking…</span>
+          <span class="spinner" aria-hidden="true"></span>
+        </button>
+      </form>
+    </div>
   </div>
 </section>
 

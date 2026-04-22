@@ -1,11 +1,15 @@
-from typing import Annotated
+from typing import Annotated, Any
 
 import polars as pl
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
+from loguru import logger
 
 from dia_run.dashboard.charts.single_activity import create_single_activity_carelink_chart
 from dia_run.data_processing.data_processing import DataProcessor
+from dia_run.llm.openrouter_client import OpenRouterError, request_recommendation
+from dia_run.llm.run_context import build_run_context
+from dia_run.settings import settings
 from dia_run.web.dependencies import get_data_processor
 from dia_run.web.plotly_embed import PLOTLY_CDN, render_plotly_figure
 from dia_run.web.templates import templates
@@ -36,8 +40,8 @@ def list_activities(
                 "time": row["human_readable_time"],
                 "pace": row["human_readable_pace"],
                 "average_heartrate": (f"{average_heartrate:.0f} bpm" if average_heartrate is not None else "N/A"),
-                "avg_glucose": f"{avg_sg:.0f} mg/dL" if avg_sg is not None else "\u2014",
-                "time_in_range": f"{tir_pct:.0f}%" if tir_pct is not None else "\u2014",
+                "avg_glucose": f"{avg_sg:.0f} mg/dL" if avg_sg is not None else "—",
+                "time_in_range": f"{tir_pct:.0f}%" if tir_pct is not None else "—",
                 "run_type": str(row["run_type"]),
             }
         )
@@ -59,13 +63,16 @@ def list_activities(
     )
 
 
-@router.get("/{activity_id}", response_class=HTMLResponse)
-def activity_detail(
-    request: Request,
+def _build_activity_detail_context(
     *,
+    request: Request,
     activity_id: int,
-    data_processor: Annotated[DataProcessor, Depends(get_data_processor)],
-) -> HTMLResponse:
+    data_processor: DataProcessor,
+    recommendation: str | None = None,
+    recommendation_error: str | None = None,
+    recommendation_model: str | None = None,
+    recommendation_reasoning_effort: str | None = None,
+) -> dict[str, Any]:
     df_summary = data_processor.get_summary()
     activity_df = df_summary.filter(pl.col("activity_id") == activity_id)
     if activity_df.is_empty():
@@ -84,8 +91,8 @@ def activity_detail(
         "time": row["human_readable_time"],
         "pace": row["human_readable_pace"],
         "average_heartrate": (f"{average_heartrate:.0f} bpm" if average_heartrate is not None else "N/A"),
-        "avg_glucose": f"{avg_sg:.0f} mg/dL" if avg_sg is not None else "\u2014",
-        "time_in_range": f"{tir_pct:.0f}%" if tir_pct is not None else "\u2014",
+        "avg_glucose": f"{avg_sg:.0f} mg/dL" if avg_sg is not None else "—",
+        "time_in_range": f"{tir_pct:.0f}%" if tir_pct is not None else "—",
         "run_type": str(row["run_type"]),
     }
 
@@ -120,17 +127,79 @@ def activity_detail(
         {"label": "Activities", "href": "/activities"},
     ]
 
-    return templates.TemplateResponse(
-        request,
-        "pages/activity_detail.html",
-        {
-            "request": request,
-            "title": f"Activity {activity['activity_id']}",
-            "plotly_cdn": PLOTLY_CDN,
-            "page_links": page_links,
-            "activity": activity,
-            "chart": chart,
-            "pre_run": pre_run,
-            "fueling": fueling,
-        },
+    return {
+        "request": request,
+        "title": f"Activity {activity['activity_id']}",
+        "plotly_cdn": PLOTLY_CDN,
+        "page_links": page_links,
+        "activity": activity,
+        "chart": chart,
+        "pre_run": pre_run,
+        "fueling": fueling,
+        "recommendation": recommendation,
+        "recommendation_error": recommendation_error,
+        "recommendation_model": recommendation_model,
+        "recommendation_reasoning_effort": recommendation_reasoning_effort,
+    }
+
+
+@router.get("/{activity_id}", response_class=HTMLResponse)
+def activity_detail(
+    request: Request,
+    *,
+    activity_id: int,
+    data_processor: Annotated[DataProcessor, Depends(get_data_processor)],
+) -> HTMLResponse:
+    context = _build_activity_detail_context(
+        request=request,
+        activity_id=activity_id,
+        data_processor=data_processor,
     )
+    return templates.TemplateResponse(request, "pages/activity_detail.html", context)
+
+
+@router.post("/{activity_id}/recommendation", response_class=HTMLResponse)
+def activity_recommendation(
+    request: Request,
+    *,
+    activity_id: int,
+    data_processor: Annotated[DataProcessor, Depends(get_data_processor)],
+) -> HTMLResponse:
+    recommendation: str | None = None
+    recommendation_error: str | None = None
+    try:
+        run_context = build_run_context(processor=data_processor, activity_id=activity_id)
+        raw_recommendation = request_recommendation(run_context=run_context)
+        recommendation = "\n".join(line.lstrip() for line in raw_recommendation.splitlines()).strip()
+    except OpenRouterError as exc:
+        logger.warning("AI recommendation failed for activity {aid}: {err}", aid=activity_id, err=str(exc))
+        recommendation_error = str(exc)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    recommendation_model = settings.openrouter_model
+    recommendation_reasoning_effort = settings.openrouter_reasoning_effort or "off"
+
+    if request.headers.get("HX-Request") == "true":
+        return templates.TemplateResponse(
+            request,
+            "partials/_ai_recommendation.html",
+            {
+                "request": request,
+                "recommendation": recommendation,
+                "recommendation_error": recommendation_error,
+                "recommendation_model": recommendation_model,
+                "recommendation_reasoning_effort": recommendation_reasoning_effort,
+            },
+        )
+
+    context = _build_activity_detail_context(
+        request=request,
+        activity_id=activity_id,
+        data_processor=data_processor,
+        recommendation=recommendation,
+        recommendation_error=recommendation_error,
+        recommendation_model=recommendation_model,
+        recommendation_reasoning_effort=recommendation_reasoning_effort,
+    )
+    return templates.TemplateResponse(request, "pages/activity_detail.html", context)

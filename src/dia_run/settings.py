@@ -25,6 +25,10 @@ class AppSettings(BaseSettings):
     aws_region: str | None = None
     heartbeat_email_from: str | None = None
     heartbeat_email_to: str | None = None
+    openrouter_api_key: str | None = None
+    openrouter_model: str = "mistralai/mistral-small-2603"
+    openrouter_timeout_seconds: float = Field(default=120.0, gt=0)
+    openrouter_reasoning_effort: Literal["", "low", "medium", "high"] = "high"
 
     @field_validator("s3_prefix")
     @classmethod

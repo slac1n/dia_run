@@ -1,3 +1,9 @@
+## v0.31.0 (2026-04-22)
+
+### Feat
+
+- add AI run recommendations on activity detail page
+
 ## v0.30.0 (2026-04-21)
 
 ### Feat
