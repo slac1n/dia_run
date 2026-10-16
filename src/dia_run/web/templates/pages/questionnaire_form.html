@@ -30,105 +30,165 @@
 {% endif %}
 
 <form class="form-card" method="post">
-  <section class="form-section">
+  <section class="form-section" data-questionnaire-section data-entry-label="pre-run nutrition">
     <div class="form-header">
       <h3>Pre-run nutrition</h3>
-      <p class="form-note">Add up to three entries. Use negative minutes for pre-run timing.</p>
+      <p class="form-note">Use negative minutes for pre-run timing.</p>
     </div>
-    {% for _ in range(3) %}
-    <div class="form-row">
-      <div class="field-group">
-        <label>Carbs (g)</label>
-        <input type="number" name="pre_run_carbohydrates_g" min="0" step="1" placeholder="30" />
+    <div class="questionnaire-entries" data-entries>
+      {% for entry in form_values.get("pre_run") or [{}, {}, {}] %}
+      <div class="questionnaire-entry" role="group" aria-label="Pre-run nutrition entry {{ loop.index }}" data-entry>
+        <div class="questionnaire-entry-header">
+          <span data-entry-number>Entry {{ loop.index }}</span>
+          <button class="button button-outline" type="button" data-remove-entry aria-label="Remove pre-run nutrition entry {{ loop.index }}">Remove</button>
+        </div>
+        <div class="form-row">
+          <div class="field-group">
+            <label for="pre_run_carbohydrates_g-{{ loop.index }}">Carbs (g)</label>
+            <input type="number" name="pre_run_carbohydrates_g" id="pre_run_carbohydrates_g-{{ loop.index }}" min="0" step="1" placeholder="30"
+              value="{{ entry.get("carbohydrates_g") if entry.get("carbohydrates_g") is not none else "" }}" />
+          </div>
+          <div class="field-group">
+            <label for="pre_run_time_before_start_min-{{ loop.index }}">Minutes before start</label>
+            <input type="number" name="pre_run_time_before_start_min" id="pre_run_time_before_start_min-{{ loop.index }}" max="0" step="1" placeholder="-30"
+              value="{{ entry.get("time_before_start_min") if entry.get("time_before_start_min") is not none else "" }}" />
+          </div>
+          <div class="field-group">
+            <label for="pre_run_bolus_percentage-{{ loop.index }}">Bolus (%)</label>
+            <input type="number" name="pre_run_bolus_percentage" id="pre_run_bolus_percentage-{{ loop.index }}" min="0" max="100" step="1" placeholder="70"
+              value="{{ entry.get("bolus_percentage") if entry.get("bolus_percentage") is not none else "" }}" />
+          </div>
+          <div class="field-group">
+            <label for="pre_run_food_type-{{ loop.index }}">Food type</label>
+            <input type="text" name="pre_run_food_type" id="pre_run_food_type-{{ loop.index }}" placeholder="Energy bar"
+              value="{{ entry.get("food_type") if entry.get("food_type") is not none else "" }}" />
+          </div>
+        </div>
       </div>
-      <div class="field-group">
-        <label>Minutes before start</label>
-        <input type="number" name="pre_run_time_before_start_min" max="0" step="1" placeholder="-30" />
-      </div>
-      <div class="field-group">
-        <label>Bolus (%)</label>
-        <input type="number" name="pre_run_bolus_percentage" min="0" max="100" step="1" placeholder="70" />
-      </div>
-      <div class="field-group">
-        <label>Food type</label>
-        <input type="text" name="pre_run_food_type" placeholder="Energy bar" />
-      </div>
+      {% endfor %}
     </div>
-    {% endfor %}
+    <div>
+      <button class="button button-outline" type="button" data-add-entry>Add pre-run nutrition entry</button>
+    </div>
+    <span class="sr-only" role="status" data-entry-status></span>
   </section>
 
-  <section class="form-section">
+  <section class="form-section" data-questionnaire-section data-entry-label="basal adjustment">
     <div class="form-header">
       <h3>Basal adjustments</h3>
       <p class="form-note">Optional. Use negative minutes for adjustments before the run.</p>
     </div>
-    {% for _ in range(3) %}
-    <div class="form-row">
-      <div class="field-group">
-        <label>Type</label>
-        <select name="basal_type">
-          <option value="">Select</option>
-          <option value="Temporal SmartGuard">Temporal SmartGuard</option>
-          <option value="Temporal Basalrate">Temporal Basalrate</option>
-          <option value="Stop Pump">Stop Pump</option>
-        </select>
+    <div class="questionnaire-entries" data-entries>
+      {% for entry in form_values.get("basal_adjustments") or [{}, {}, {}] %}
+      <div class="questionnaire-entry" role="group" aria-label="Basal adjustment entry {{ loop.index }}" data-entry>
+        <div class="questionnaire-entry-header">
+          <span data-entry-number>Entry {{ loop.index }}</span>
+          <button class="button button-outline" type="button" data-remove-entry aria-label="Remove basal adjustment entry {{ loop.index }}">Remove</button>
+        </div>
+        <div class="form-row">
+          <div class="field-group">
+            <label for="basal_type-{{ loop.index }}">Type</label>
+            <select name="basal_type" id="basal_type-{{ loop.index }}">
+              <option value="">Select</option>
+              <option value="Temporal SmartGuard" {% if entry.get("type") == "Temporal SmartGuard" %}selected{% endif %}>Temporal SmartGuard</option>
+              <option value="Temporal Basalrate" {% if entry.get("type") == "Temporal Basalrate" %}selected{% endif %}>Temporal Basalrate</option>
+              <option value="Stop Pump" {% if entry.get("type") == "Stop Pump" %}selected{% endif %}>Stop Pump</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label for="basal_start_time_min-{{ loop.index }}">Start time (min)</label>
+            <input type="number" name="basal_start_time_min" id="basal_start_time_min-{{ loop.index }}" step="1" placeholder="-10"
+              value="{{ entry.get("start_time_min") if entry.get("start_time_min") is not none else "" }}" />
+          </div>
+          <div class="field-group">
+            <label for="basal_end_time_min-{{ loop.index }}">End time (min)</label>
+            <input type="number" name="basal_end_time_min" id="basal_end_time_min-{{ loop.index }}" step="1" placeholder="60"
+              value="{{ entry.get("end_time_min") if entry.get("end_time_min") is not none else "" }}" />
+          </div>
+          <div class="field-group">
+            <label for="basal_rate_percentage-{{ loop.index }}">Basal rate (%)</label>
+            <input type="number" name="basal_rate_percentage" id="basal_rate_percentage-{{ loop.index }}" min="0" step="1" placeholder="20"
+              value="{{ entry.get("basal_rate_percentage") if entry.get("basal_rate_percentage") is not none else "" }}" />
+          </div>
+        </div>
       </div>
-      <div class="field-group">
-        <label>Start time (min)</label>
-        <input type="number" name="basal_start_time_min" step="1" placeholder="-10" />
-      </div>
-      <div class="field-group">
-        <label>End time (min)</label>
-        <input type="number" name="basal_end_time_min" step="1" placeholder="60" />
-      </div>
-      <div class="field-group">
-        <label>Basal rate (%)</label>
-        <input type="number" name="basal_rate_percentage" min="0" step="1" placeholder="20" />
-      </div>
+      {% endfor %}
     </div>
-    {% endfor %}
+    <div>
+      <button class="button button-outline" type="button" data-add-entry>Add basal adjustment entry</button>
+    </div>
+    <span class="sr-only" role="status" data-entry-status></span>
   </section>
 
-  <section class="form-section">
+  <section class="form-section" data-questionnaire-section data-entry-label="fueling">
     <div class="form-header">
       <h3>Fueling during run</h3>
-      <p class="form-note">Add up to three entries. Minutes are relative to run start.</p>
+      <p class="form-note">Minutes are relative to run start.</p>
     </div>
-    {% for _ in range(3) %}
-    <div class="form-row form-row--three">
-      <div class="field-group">
-        <label>Carbs (g)</label>
-        <input type="number" name="fueling_carbohydrates_g" min="0" step="1" placeholder="15" />
+    <div class="questionnaire-entries" data-entries>
+      {% for entry in form_values.get("fueling_during_run") or [{}, {}, {}] %}
+      <div class="questionnaire-entry" role="group" aria-label="Fueling entry {{ loop.index }}" data-entry>
+        <div class="questionnaire-entry-header">
+          <span data-entry-number>Entry {{ loop.index }}</span>
+          <button class="button button-outline" type="button" data-remove-entry aria-label="Remove fueling entry {{ loop.index }}">Remove</button>
+        </div>
+        <div class="form-row form-row--three">
+          <div class="field-group">
+            <label for="fueling_carbohydrates_g-{{ loop.index }}">Carbs (g)</label>
+            <input type="number" name="fueling_carbohydrates_g" id="fueling_carbohydrates_g-{{ loop.index }}" min="0" step="1" placeholder="15"
+              value="{{ entry.get("carbohydrates_g") if entry.get("carbohydrates_g") is not none else "" }}" />
+          </div>
+          <div class="field-group">
+            <label for="fueling_time_during_run_min-{{ loop.index }}">Minutes in</label>
+            <input type="number" name="fueling_time_during_run_min" id="fueling_time_during_run_min-{{ loop.index }}" min="0" step="1" placeholder="20"
+              value="{{ entry.get("time_during_run_min") if entry.get("time_during_run_min") is not none else "" }}" />
+          </div>
+          <div class="field-group">
+            <label for="fueling_food_type-{{ loop.index }}">Food type</label>
+            <input type="text" name="fueling_food_type" id="fueling_food_type-{{ loop.index }}" placeholder="Energy gel"
+              value="{{ entry.get("food_type") if entry.get("food_type") is not none else "" }}" />
+          </div>
+        </div>
       </div>
-      <div class="field-group">
-        <label>Minutes in</label>
-        <input type="number" name="fueling_time_during_run_min" min="0" step="1" placeholder="20" />
-      </div>
-      <div class="field-group">
-        <label>Food type</label>
-        <input type="text" name="fueling_food_type" placeholder="Energy gel" />
-      </div>
+      {% endfor %}
     </div>
-    {% endfor %}
+    <div>
+      <button class="button button-outline" type="button" data-add-entry>Add fueling entry</button>
+    </div>
+    <span class="sr-only" role="status" data-entry-status></span>
   </section>
 
-  <section class="form-section">
+  <section class="form-section" data-questionnaire-section data-entry-label="manual bolus">
     <div class="form-header">
       <h3>Manual bolus</h3>
       <p class="form-note">Optional. Use minutes relative to run start.</p>
     </div>
-    {% for _ in range(3) %}
-    <div class="form-row form-row--two">
-      <div class="field-group">
-        <label>Time of bolus (min)</label>
-        <input type="number" name="bolus_time_of_bolus_min" step="1" placeholder="20" />
+    <div class="questionnaire-entries" data-entries>
+      {% for entry in form_values.get("bolus") or [{}, {}, {}] %}
+      <div class="questionnaire-entry" role="group" aria-label="Manual bolus entry {{ loop.index }}" data-entry>
+        <div class="questionnaire-entry-header">
+          <span data-entry-number>Entry {{ loop.index }}</span>
+          <button class="button button-outline" type="button" data-remove-entry aria-label="Remove manual bolus entry {{ loop.index }}">Remove</button>
+        </div>
+        <div class="form-row form-row--two">
+          <div class="field-group">
+            <label for="bolus_time_of_bolus_min-{{ loop.index }}">Time of bolus (min)</label>
+            <input type="number" name="bolus_time_of_bolus_min" id="bolus_time_of_bolus_min-{{ loop.index }}" step="1" placeholder="20"
+              value="{{ entry.get("time_of_bolus_min") if entry.get("time_of_bolus_min") is not none else "" }}" />
+          </div>
+          <div class="field-group">
+            <label for="bolus_units-{{ loop.index }}">Bolus units</label>
+            <input type="number" name="bolus_units" id="bolus_units-{{ loop.index }}" min="0" step="0.1" placeholder="0.5"
+              value="{{ entry.get("bolus_units") if entry.get("bolus_units") is not none else "" }}" />
+          </div>
+        </div>
       </div>
-      <div class="field-group">
-        <label>Bolus units</label>
-        <input type="number" name="bolus_units" min="0" step="0.1" placeholder="0.5" />
-      </div>
+      {% endfor %}
     </div>
-    {% endfor %}
+    <div>
+      <button class="button button-outline" type="button" data-add-entry>Add manual bolus entry</button>
+    </div>
+    <span class="sr-only" role="status" data-entry-status></span>
   </section>
 
   <div class="form-actions">
@@ -136,4 +196,60 @@
     <a class="button button-outline" href="/activities/{{ activity.activity_id }}">View activity</a>
   </div>
 </form>
+<script>
+  document.querySelectorAll("[data-questionnaire-section]").forEach((section) => {
+    const entries = section.querySelector("[data-entries]");
+    const addButton = section.querySelector("[data-add-entry]");
+    const status = section.querySelector("[data-entry-status]");
+    const entryLabel = section.dataset.entryLabel;
+
+    const clearEntry = (entry) => {
+      entry.querySelectorAll("input, select").forEach((field) => {
+        field.value = "";
+        if (field.tagName === "INPUT") field.removeAttribute("value");
+        field.querySelectorAll("option").forEach((option) => option.removeAttribute("selected"));
+      });
+    };
+
+    const numberEntries = () => {
+      Array.from(entries.children).forEach((entry, index) => {
+        const number = index + 1;
+        entry.setAttribute("aria-label", `${entryLabel} entry ${number}`);
+        entry.querySelector("[data-entry-number]").textContent = `Entry ${number}`;
+        entry.querySelector("[data-remove-entry]").setAttribute("aria-label", `Remove ${entryLabel} entry ${number}`);
+        entry.querySelectorAll(".field-group").forEach((group) => {
+          const field = group.querySelector("input, select");
+          field.id = `${field.name}-${number}`;
+          group.querySelector("label").htmlFor = field.id;
+        });
+      });
+    };
+
+    addButton.addEventListener("click", () => {
+      const entry = entries.firstElementChild.cloneNode(true);
+      clearEntry(entry);
+      entries.append(entry);
+      numberEntries();
+      entry.querySelector("input, select").focus();
+      status.textContent = `Added ${entryLabel} entry ${entries.children.length}.`;
+    });
+
+    entries.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-remove-entry]");
+      if (!button) return;
+      const entry = button.closest("[data-entry]");
+      if (entries.children.length === 1) {
+        clearEntry(entry);
+        entry.querySelector("input, select").focus();
+        status.textContent = `Cleared ${entryLabel} entry.`;
+        return;
+      }
+      const nextEntry = entry.nextElementSibling || entry.previousElementSibling;
+      entry.remove();
+      numberEntries();
+      nextEntry.querySelector("input, select").focus();
+      status.textContent = `Removed ${entryLabel} entry. ${entries.children.length} remaining.`;
+    });
+  });
+</script>
 {% endblock %}

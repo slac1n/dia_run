@@ -68,6 +68,10 @@ Key pages:
 
 Use the "Download new data" button on the dashboard to trigger the fetch workflow.
 
+In the questionnaire, each section starts with three blank entries. Use its **Add entry** button
+(for example, **Add fueling entry**) for longer runs, and **Remove** to discard a row.
+Saved questionnaires load their existing entries when reopened; validation errors retain the submitted values.
+
 ### Docker
 ```bash
 docker compose up --build
