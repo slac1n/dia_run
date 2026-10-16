@@ -1,3 +1,9 @@
+## v0.32.0 (2026-10-16)
+
+### Feat
+
+- allow additional questionnaire entries for long runs
+
 ## v0.31.0 (2026-04-22)
 
 ### Feat
