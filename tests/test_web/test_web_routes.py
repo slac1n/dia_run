@@ -1,5 +1,7 @@
 import json
+import re
 from collections.abc import Generator
+from html import unescape
 from unittest.mock import MagicMock
 from urllib.parse import quote
 
@@ -9,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from dia_run.data_fetcher.exceptions import CareLinkDataStaleError
 from dia_run.data_models.paths import DataPaths
+from dia_run.data_models.questionnaire import QuestionnaireModel
 from dia_run.web.app import app
 from dia_run.web.dependencies import get_data_fetcher_service, get_data_paths, get_s3_sync_service
 from dia_run.web.fetch_status import set_fetch_status
@@ -316,6 +319,98 @@ def test_questionnaire_submission(*, client: TestClient, web_data_paths: DataPat
 
     assert len(saved["pre_run"]) == 1
     assert len(saved["fueling_during_run"]) == 1
+
+
+def _input_values(*, html: str, name: str) -> list[str]:
+    return [unescape(value) for value in re.findall(rf'<input\b[^>]*name="{name}"[^>]*value="([^"]*)"', html)]
+
+
+def test_new_questionnaire_has_three_blank_rows_and_add_buttons(
+    *, client: TestClient, web_data_paths: DataPaths
+) -> None:
+    (web_data_paths.questionnaire / "1002.json").unlink(missing_ok=True)
+
+    response = client.get("/questionnaire/1002")
+
+    assert response.status_code == 200
+    for name in ("pre_run_carbohydrates_g", "basal_start_time_min", "fueling_carbohydrates_g", "bolus_units"):
+        assert _input_values(html=response.text, name=name) == ["", "", ""]
+    assert response.text.count('type="button" data-add-entry') == 4
+    assert "Add up to three entries" not in response.text
+
+
+def test_marathon_questionnaire_saves_and_reopens_all_entries(*, client: TestClient, web_data_paths: DataPaths) -> None:
+    carbs = [str(20 + index) for index in range(12)]
+    timings = [str(index * 20) for index in range(12)]
+    foods = [f'Gel {index + 1} & "drink"' for index in range(12)]
+    response = client.post(
+        "/questionnaire/1002",
+        data={
+            "fueling_carbohydrates_g": [*carbs, ""],
+            "fueling_time_during_run_min": [*timings, ""],
+            "fueling_food_type": [*foods, ""],
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    saved = QuestionnaireModel.model_validate_json((web_data_paths.questionnaire / "1002.json").read_text())
+    assert len(saved.fueling_during_run) == 12
+    assert [entry.carbohydrates_g for entry in saved.fueling_during_run] == list(range(20, 32))
+    assert [entry.time_during_run_min for entry in saved.fueling_during_run] == list(range(0, 240, 20))
+    assert [entry.food_type for entry in saved.fueling_during_run] == foods
+
+    reopened = client.get("/questionnaire/1002")
+    assert reopened.status_code == 200
+    assert _input_values(html=reopened.text, name="fueling_carbohydrates_g") == carbs
+    assert _input_values(html=reopened.text, name="fueling_time_during_run_min") == timings
+    assert _input_values(html=reopened.text, name="fueling_food_type") == foods
+
+
+def test_invalid_questionnaire_retains_all_sections_without_overwriting(
+    *, client: TestClient, web_data_paths: DataPaths
+) -> None:
+    questionnaire_path = web_data_paths.questionnaire / "1002.json"
+    original = questionnaire_path.read_text()
+    sync_service = MagicMock()
+    app.dependency_overrides[get_s3_sync_service] = lambda: sync_service
+    form = {
+        "pre_run_carbohydrates_g": ["30"],
+        "pre_run_time_before_start_min": ["-30"],
+        "pre_run_bolus_percentage": ["0"],
+        "pre_run_food_type": ['Toast & "jam"'],
+        "basal_type": ["Temporal Basalrate", "Stop Pump"],
+        "basal_start_time_min": ["-10", "0"],
+        "basal_end_time_min": ["0", "20"],
+        "basal_rate_percentage": ["0", ""],
+        "fueling_carbohydrates_g": ["20"] * 11 + ["0"],
+        "fueling_time_during_run_min": [str(index * 20) for index in range(12)],
+        "fueling_food_type": [f"Gel {index}" for index in range(12)],
+        "bolus_time_of_bolus_min": ["0"],
+        "bolus_units": ["0.5"],
+    }
+    try:
+        response = client.post("/questionnaire/1002", data=form)
+    finally:
+        app.dependency_overrides.pop(get_s3_sync_service, None)
+
+    assert response.status_code == 422
+    assert "Form errors" in response.text
+    for name, values in form.items():
+        if name != "basal_type":
+            assert _input_values(html=response.text, name=name) == values
+    assert '<option value="Temporal Basalrate" selected>' in response.text
+    assert '<option value="Stop Pump" selected>' in response.text
+    assert questionnaire_path.read_text() == original
+    sync_service.sync_to_s3_after_questionnaire.assert_not_called()
+
+    form["fueling_carbohydrates_g"][-1] = "25"
+    corrected = client.post("/questionnaire/1002", data=form, follow_redirects=False)
+    assert corrected.status_code == 303
+    reopened = client.get("/questionnaire/1002")
+    assert _input_values(html=reopened.text, name="basal_rate_percentage") == ["0.0", ""]
+    assert _input_values(html=reopened.text, name="pre_run_bolus_percentage") == ["0.0"]
+    assert _input_values(html=reopened.text, name="bolus_units") == ["0.5"]
 
 
 def test_questionnaire_submission_triggers_s3_sync(*, client: TestClient, web_data_paths: DataPaths) -> None:

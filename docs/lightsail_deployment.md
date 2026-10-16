@@ -225,16 +225,54 @@ The production compose file uses:
 
 ## 9. Manual Deployment Workflow
 
-For each new version:
+First complete the feature PR into `develop`, the versioned release PR into `main`, and the
+`Tag release` GitHub Actions workflow as described in [DEVELOPMENT.md](../DEVELOPMENT.md).
+GitHub Actions does not deploy to Lightsail. The server builds its images locally from the
+checked-out source; no container registry is involved in this setup.
+
+On the server, inspect the current deployment and record the previous commit/tag:
 
 ```bash
 ssh <lightsail-host>
 cd ~/dia_run
-git pull
-docker compose -f docker-compose.prod.yml up -d --build
+git status --short --branch
+git rev-parse HEAD
+git describe --tags --always
+docker compose -f docker-compose.prod.yml ps
 ```
 
-This is the documented manual process that can later be automated.
+Resolve any tracked local changes before switching versions. Wait for active fetches and S3
+uploads to finish, and keep any local app disconnected from the production bucket.
+Replace `<version>` with the released version (for example `0.32.0`), then deploy the exact tag:
+
+```bash
+git fetch origin --tags
+git switch --detach v<version>
+docker compose -f docker-compose.prod.yml build
+docker compose -f docker-compose.prod.yml up -d --wait
+docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml logs --tail=80 web cron
+```
+
+The separate build step leaves the running containers available if the build fails.
+Both `web` and `cron` use this source tree and must be updated together. Their mounted `data/`,
+`secrets/`, and `.env.prod` survive the container recreation. Web startup performs the configured
+S3 download sync before accepting requests.
+
+With WireGuard connected, check `http://<wireguard-server-ip>:8000/health`, open the dashboard,
+and verify the release version in the footer. For questionnaire changes, check the new controls
+without saving dummy entries into a real activity.
+
+If verification fails, return to the previously recorded commit/tag and rebuild both services:
+
+```bash
+git switch --detach <previous-commit-or-tag>
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml ps
+```
+
+Repeat the health and footer checks. This rolls back application code; it does not undo data
+writes. The expandable questionnaire uses the existing JSON format and needs no data migration.
 
 ## 10. VPN Access Validation
 

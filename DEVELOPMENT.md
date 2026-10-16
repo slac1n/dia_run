@@ -12,20 +12,68 @@
 - PRs into `main` must come from `release/*` or `hotfix/*`, include a version bump, update `uv.lock`, and update `CHANGELOG.md`.
 - Do not push directly to `develop` or `main`.
 
+### Feature Development
+
+Start from the latest remote `develop` with a clean working tree:
+
+```bash
+git fetch origin --prune --tags
+git switch -c codex/<feature-name> origin/develop
+uv sync --frozen
+```
+
+Implement and test the feature, then run the checks before committing:
+
+```bash
+uv run ruff check src/ tests/
+uv run ruff format --check src/ tests/
+uv run mypy src/
+S3_SYNC_ENABLED=false uv run pytest
+git add <changed-files>
+git commit -m "feat: describe the feature"
+git push -u origin HEAD
+gh pr create --base develop
+```
+
+Ruff and mypy are used by the pre-commit configuration but are not declared in the `dev`
+dependency group. They must be installed separately if `uv run` cannot find them.
+Merge the feature PR after review and a successful `Tests` workflow. Version changes belong
+on the subsequent release branch.
+
 ### Release Prep
 
 When `develop` is ready to ship, create a release branch and prepare the release metadata there:
 
 ```bash
-git checkout develop
-git pull origin develop
-git checkout -b release/<planned-version>
+git fetch origin --prune --tags
+git switch -c release/<planned-version> origin/develop
 uvx --from commitizen cz bump --yes --changelog --version-files-only
+git diff -- pyproject.toml uv.lock CHANGELOG.md
 git add pyproject.toml uv.lock CHANGELOG.md
 git commit -m "chore: prepare release"
+git push -u origin HEAD
+gh pr create --base main
 ```
 
-Open a PR from `release/*` into `main`, merge it once tests are green, and then merge the same `release/*` branch back into `develop`.
+Commitizen calculates the next version from conventional commits since the last release tag.
+Check that the computed version matches the release branch name. A feature after `0.31.0`
+normally produces `0.32.0`.
+
+The PR must pass `Tests` and `Validate main promotion`. After merging it into `main`, wait
+for `Tag release` to create `v<version>`. Use a merge commit to preserve release ancestry.
+Then open and merge a PR from the same `release/*` branch into `develop` before deleting it.
+Previous releases also used a separate back-merge branch from `main`; both paths keep release
+metadata in `develop` without pushing directly to a protected branch.
+
+### Deploy the Release to AWS
+
+GitHub Actions runs tests, validates release metadata, and creates the version tag. It does
+**not** build or deploy the production image. Docker images are built on Lightsail from the
+checked-out source, and Docker Compose runs both `web` and the CareLink heartbeat `cron` service.
+
+After the release tag exists, follow [the Lightsail deployment procedure](docs/lightsail_deployment.md#9-manual-deployment-workflow)
+to deploy that exact version, verify health and the app footer, and record the previous version
+for rollback. A successful GitHub release does not by itself update the running app.
 
 ### Hotfix Prep
 

@@ -146,6 +146,7 @@ def questionnaire_form(
 
     questionnaire_path = data_paths.questionnaire / f"{activity_id}.json"
     existing = questionnaire_path.exists()
+    form_values = json.loads(questionnaire_path.read_text()) if existing else {}
 
     page_links = [
         {"label": "Dashboard", "href": "/"},
@@ -163,6 +164,7 @@ def questionnaire_form(
             "activity": activity,
             "existing": existing,
             "errors": [],
+            "form_values": form_values,
         },
     )
 
@@ -275,13 +277,14 @@ async def submit_questionnaire(
             }
         )
 
+    form_values = {
+        "pre_run": pre_run_entries,
+        "basal_adjustments": basal_entries,
+        "fueling_during_run": fueling_entries,
+        "bolus": bolus_entries,
+    }
     try:
-        questionnaire = QuestionnaireModel(
-            pre_run=pre_run_entries,
-            basal_adjustments=basal_entries,
-            fueling_during_run=fueling_entries,
-            bolus=bolus_entries,
-        )
+        questionnaire = QuestionnaireModel.model_validate(form_values)
     except ValidationError as exc:
         errors = _format_validation_errors(errors=cast(Sequence[Mapping[str, object]], exc.errors()))
         page_links = [
@@ -299,6 +302,7 @@ async def submit_questionnaire(
                 "activity": activity,
                 "existing": existing,
                 "errors": errors,
+                "form_values": form_values,
             },
             status_code=422,
         )
