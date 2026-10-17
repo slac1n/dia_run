@@ -2,7 +2,7 @@
 
 Dia-Run brings Strava running activities and Medtronic CareLink glucose and insulin data together in an interactive dashboard. Add context about fueling, nutrition, and basal adjustments to explore how your runs and glucose patterns relate.
 
-![Activity detail with run metrics, glucose and insulin timeline, and fueling entries](docs/images/activity-detail.png)
+![Activity detail with run metrics, glucose and insulin timeline, and fueling entries](docs/images/activity-detail.jpg)
 
 *Activity detail shown with synthetic test data.*
 
