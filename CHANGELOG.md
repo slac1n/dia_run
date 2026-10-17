@@ -1,3 +1,9 @@
+## v0.32.1 (2026-10-17)
+
+### Docs
+
+- Refresh README with a concise project overview, setup instructions, and a synthetic-data app screenshot.
+
 ## v0.32.0 (2026-10-16)
 
 ### Feat
