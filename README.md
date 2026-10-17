@@ -1,95 +1,87 @@
-# Dia-Run :syringe::running:
+# Dia-Run
 
-## Installation
+Dia-Run brings Strava running activities and Medtronic CareLink glucose and insulin data together in an interactive dashboard. Add context about fueling, nutrition, and basal adjustments to explore how your runs and glucose patterns relate.
+
+![Activity detail with run metrics, glucose and insulin timeline, and fueling entries](docs/images/activity-detail.jpg)
+
+*Activity detail shown with synthetic test data.*
+
+## What it does
+
+- Shows pace and heart-rate summaries alongside a timeline of glucose, insulin, and fueling events.
+- Compares runs by type, distance, glucose outcomes, and preparation.
+- Records pre-run nutrition, basal settings, fueling, and boluses through a questionnaire.
+- Provides optional AI run recommendations through OpenRouter.
+- Includes a mock-data mode for exploring the app without connected accounts.
+
+Built with **Python 3.12**, **FastAPI**, **Jinja2**, and **Plotly**, with **Polars** for processing, **Delta Lake** for storage, and **Pandera/Pydantic** for validation.
+
+## Quick start
+
+With Python 3.12 and `uv` installed, run these commands from the repository root:
+
 ```bash
 uv sync
+cp .env.example .env
 ```
 
-### Pre-Commit Hooks
-This project uses [pre-commit](https://pre-commit.com/) to run ruff (linting + formatting) and mypy (type checking) automatically before each commit. After installing dependencies, set up the hooks:
-```bash
-uv run pre-commit install
-```
+To explore with synthetic data, set `USE_MOCK_DATA=true` in `.env`, then start the app:
 
-To run all hooks manually against the entire codebase:
-```bash
-uv run pre-commit run --all-files
-```
-
-### Architecture Diagram
-This project includes a living Mermaid class diagram that visualises the codebase structure. The diagram is stored in `docs/diagram.mmd`.
-
-To render and view it:
-```bash
-# Install the Mermaid CLI if you don't have it
-npm install -g @mermaid-js/mermaid-cli
-
-# Generate SVG from the diagram
-mmdc -i docs/diagram.mmd -o docs/diagram.svg
-
-# Open in your browser
-open docs/diagram.svg
-```
-
-Alternatively, open `docs/diagram.mmd` directly in VS Code — it has built-in Mermaid preview support.
-
-### Prepare Strava
-You need to set up [Strava API](https://developers.strava.com/docs/getting-started/) for you account and create an app.
-After that create a `.env` file and fill out the variables `CLIENT_ID` and `CLIENT_SECRET` from your newly created app.
-When fetching data for the first time, click on the Strava link provided in the terminal, log in and accept the authorization for downloading data from your account.
-
-### Prepare Carelink
-When using Dia-Run for the first time, run the setup for carelink `uv run src/dia_run/carelink_setup.py`.
-This will require you to log in to your Carelink account and will automatically create a `logindata.json` file.
-This file is valid for about a week.
-If you are using Dia-Run regularly this file automatically gets updated. 
-If you fail to use it within a week, you will need to recreate the file using the setup script.
-
-## Usage
-To get your latest data:
-1. Run `uv run fetch` to download Strava and Carelink data
-2. Afterwards you will be prompted to fill out the questionnaire about the run (basal setting, pre-run nutrition, fueling, and bolusing)
-
-**Note**: Right now, it only pulls the most recent Strava workout and the last 24 hours of Carelink data.
-This means that you should track your runs right after your workout.
-
-### Web UI
-Start the FastAPI app:
 ```bash
 uv run uvicorn dia_run.web.app:app --reload
 ```
 
-Open http://localhost:8000
+Open [localhost:8000](http://localhost:8000) and click **Download new data** to generate a sample run. Complete its questionnaire, then explore the dashboard and activity details. Repeat to add more runs.
 
-Key pages:
-- Dashboard: `/`
-- Activities: `/activities`
-- Questionnaire: `/questionnaire`
+Mock mode stores generated data in `./mock-data/` and does not call Strava or CareLink. Live data is stored in `./data/` by default.
 
-Use the "Download new data" button on the dashboard to trigger the fetch workflow.
+## Connect your accounts
 
-In the questionnaire, each section starts with three blank entries. Use its **Add entry** button
-(for example, **Add fueling entry**) for longer runs, and **Remove** to discard a row.
-Saved questionnaires load their existing entries when reopened; validation errors retain the submitted values.
+Set `USE_MOCK_DATA=false` in `.env` before using live data.
 
-### Docker
+1. **Strava:** Create a Strava API application with `localhost` as its authorization callback domain. Add its `CLIENT_ID` and `CLIENT_SECRET` to `.env`.
+2. **CareLink:** With Firefox installed, run the setup command below and follow the login flow. It creates `logindata.json` in the repository root. Add `--us` for a US account.
+
+   ```bash
+   uv run src/dia_run/data_fetcher/carelink_setup.py
+   ```
+
+3. **First import:** Run the fetch command from a terminal. Follow the Strava authorization flow and paste the redirected URL when prompted. The command then imports data and opens the run questionnaire.
+
+   ```bash
+   uv run fetch
+   ```
+
+After setup, use **Download new data** in the web app or `uv run fetch` for subsequent imports. Questionnaires can also be completed or edited in the web app.
+
+The importer checks the latest Strava activity and imports it only if it is a run. CareLink supplies recent data rather than a full historical archive, so import soon after a workout.
+
+## Optional features
+
+**AI recommendations:** Set `OPENROUTER_API_KEY` in `.env` to enable recommendations on activity pages. Requests send run and health context to OpenRouter and the selected model provider. `OPENROUTER_MODEL` selects the model.
+
+**Docker:** After completing account setup locally, start the web app with:
+
 ```bash
 docker compose up --build
 ```
 
-Open http://localhost:8000
+The local Compose configuration mounts `.env`, `logindata.json`, and `./data/`. Open [localhost:8000](http://localhost:8000).
 
-Ensure `.env` and `logindata.json` exist locally so the container can authenticate with Strava and CareLink.
+**Deployment:** See the [Lightsail deployment guide](docs/lightsail_deployment.md) for production Docker Compose, WireGuard access, S3 sync, and recovery. Email alert setup is covered in the [SES guide](docs/ses_setup.md).
 
-### Production Deployment
-Production deployment targets AWS Lightsail with Docker Compose, WireGuard-only access, and S3-backed `./data` sync.
+## Development
 
-- Use `docker-compose.prod.yml` for the production container.
-- Keep production secrets in `.env.prod` on the server; do not commit it.
-- Mount runtime secrets such as `logindata.json` and the Strava refresh token through `./secrets/` on the server.
-- Follow the full provisioning, VPN, deploy, and recovery guide in `docs/lightsail_deployment.md`.
+Install the commit hooks and run the project checks:
 
-## AWS Backup
+```bash
+uv run pre-commit install
+uv run pre-commit run --all-files
+uv run pytest
 ```
-aws s3 sync ./data s3://dia-run-bucket/ --profile personal --exclude "*/.DS_Store"
-```
+
+The hooks run Ruff linting and formatting plus mypy type checking. CI runs the test suite on pull requests into `develop` and `main`.
+
+The code follows a data pipeline: API clients → validated data models → processing → charts and web views. See the [architecture diagram](docs/diagram.mmd) for the class and module relationships.
+
+Create feature branches from `develop` and open pull requests back into `develop`. Production releases reach `main` through `release/*` or `hotfix/*` branches. See [AGENTS.md](AGENTS.md) for coding conventions and the release workflow.
