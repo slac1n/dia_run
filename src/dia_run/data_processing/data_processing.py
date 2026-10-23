@@ -1108,7 +1108,6 @@ class DataProcessor:
 
     def _get_questionnaire_cache(self) -> dict[int, QuestionnaireModel]:
         if self._questionnaire_cache is None:
-            self.data_paths.questionnaire.mkdir(parents=True, exist_ok=True)
             self._questionnaire_cache = {}
             for questionnaire_path in self.data_paths.questionnaire.glob("*.json"):
                 if not questionnaire_path.stem.isdigit():

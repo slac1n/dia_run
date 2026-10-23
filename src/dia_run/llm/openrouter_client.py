@@ -52,35 +52,55 @@ def request_recommendation(*, run_context: str) -> str:
         # Models without reasoning support ignore the field.
         payload["reasoning"] = {"effort": settings.openrouter_reasoning_effort}
 
-    headers = {
-        "Authorization": f"Bearer {settings.openrouter_api_key}",
-        "Content-Type": "application/json",
-    }
+    message = _request_message(payload=payload)
+    content = message.get("content")
+    if not isinstance(content, str) or not content.strip():
+        raise OpenRouterError("OpenRouter response did not contain a completion.")
+    return content.strip()
 
+
+def request_tool_completion(*, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> dict[str, Any]:
+    """Request one tool-capable completion without logging health data."""
+    payload: dict[str, Any] = {
+        "model": settings.openrouter_model,
+        "messages": messages,
+        "max_tokens": 4000,
+        "provider": {"require_parameters": True, "data_collection": "deny", "zdr": True},
+    }
+    if tools:
+        payload.update(tools=tools, tool_choice="auto")
+    if settings.openrouter_reasoning_effort:
+        payload["reasoning"] = {"effort": settings.openrouter_reasoning_effort}
+    return _request_message(payload=payload)
+
+
+def _request_message(*, payload: dict[str, Any]) -> dict[str, Any]:
+    if not settings.openrouter_api_key:
+        raise OpenRouterError("OPENROUTER_API_KEY is not configured.")
     try:
         response = requests.post(
             OPENROUTER_URL,
             json=payload,
-            headers=headers,
+            headers={"Authorization": f"Bearer {settings.openrouter_api_key}", "Content-Type": "application/json"},
             timeout=settings.openrouter_timeout_seconds,
         )
     except requests.RequestException as exc:
-        logger.error("OpenRouter request failed: {error}", error=str(exc))
-        raise OpenRouterError(f"OpenRouter request failed: {exc}") from exc
-
+        logger.error("OpenRouter transport request failed")
+        raise OpenRouterError("OpenRouter request failed. Please retry.") from exc
     if response.status_code != 200:
-        logger.error(
-            "OpenRouter returned {status}: {body}",
-            status=response.status_code,
-            body=response.text[:500],
-        )
+        logger.error("OpenRouter returned HTTP {status}", status=response.status_code)
         raise OpenRouterError(f"OpenRouter returned HTTP {response.status_code}.")
-
-    data = response.json()
     try:
-        content: str = data["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError) as exc:
-        logger.error("OpenRouter response missing content: {body}", body=str(data)[:500])
-        raise OpenRouterError("OpenRouter response did not contain a completion.") from exc
-
-    return content.strip()
+        data = response.json()
+        choice = data["choices"][0]
+        if choice.get("finish_reason") == "length":
+            raise OpenRouterError(
+                "The model reached its output limit before completing the answer. "
+                "Try a narrower question or lower OPENROUTER_REASONING_EFFORT."
+            )
+        message = choice["message"]
+        if not isinstance(message, dict):
+            raise TypeError("Invalid message")
+    except (ValueError, KeyError, IndexError, TypeError) as exc:
+        raise OpenRouterError("OpenRouter response did not contain a valid completion.") from exc
+    return message

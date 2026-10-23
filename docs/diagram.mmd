@@ -24,6 +24,15 @@ classDiagram
         +str | None aws_region
         +str | None heartbeat_email_from
         +str | None heartbeat_email_to
+        +bool coach_enabled
+        +Path coach_history_path
+        +int coach_max_rounds
+        +int coach_max_tool_calls
+        +int coach_max_context_chars
+        +str openrouter_api_key
+        +str openrouter_model
+        +float openrouter_timeout_seconds
+        +str openrouter_reasoning_effort
         +is_production() bool
     }
 
@@ -532,3 +541,182 @@ classDiagram
     OverviewPageService --> DataPaths
     OverviewPageService --> OverviewDataService
     OverviewPageService --> DashboardOverviewContext
+
+    %% Local conversational coach
+    class StrictModel {
+        +ConfigDict model_config
+    }
+    class ActivityQuery {
+        +RunType run_type
+        +str after
+        +float min_distance_km
+        +float max_distance_km
+        +int limit
+        +str before
+    }
+    class ActivityRequest {
+        +int activity_id
+    }
+    class GlucoseRequest {
+        +int start_min
+        +int end_min
+        +int offset
+    }
+    class ComparisonRequest {
+        +int tolerance_pct
+        +int limit
+    }
+    class Evidence {
+        +str id
+        +str tool
+        +list activity_ids
+        +dict data
+    }
+    class ToolFunction {
+        +str name
+        +str arguments
+    }
+    class ToolCall {
+        +int index
+        +str id
+        +Literal type
+        +ToolFunction function
+    }
+    class CoachTools {
+        +DataProcessor processor
+        +ChatStore store
+        +str owner
+        +memory_context(query) list
+        +memory_count() int
+        +execute(name, arguments, evidence_id) Evidence
+    }
+    class CoachToolDefinitions {
+        <<module>>
+        +tool_definitions(include_memory) list
+    }
+    class CoachAgent {
+        <<module>>
+        +respond(messages, question, tools) list
+    }
+    class ChatStore {
+        +Path path
+        +create(owner) str
+        +get_attempt(chat_id, owner) tuple
+        +record_attempt(chat_id, owner, question, error, revision) int
+        +list_chats(owner) list
+        +load(chat_id, owner) tuple
+        +save(chat_id, owner, messages, revision, answer) None
+        +list_memories(owner) list
+        +search_memories(owner, query, limit, include_context) list
+        +forget_memory(memory_id, owner) None
+        +delete(chat_id, owner) None
+    }
+    class CoachRoutes {
+        <<module>>
+        +require_coach_enabled() None
+        +coach_page(request, chat_id, error) HTMLResponse
+        +coach_message(request, data_processor, question, csrf_token, chat_id, consent) Response
+        +delete_coach(request, chat_id, csrf_token) RedirectResponse
+        +forget_coach_memory(request, memory_id, csrf_token) RedirectResponse
+    }
+    class OpenRouterClient {
+        <<module>>
+        +request_recommendation(run_context) str
+        +request_tool_completion(messages, tools) dict
+    }
+    class OpenRouterError {
+        <<exception>>
+    }
+    class RunContext {
+        <<module>>
+        +build_run_context(processor, activity_id) str
+    }
+    StrictModel --|> BaseModel
+    ActivityQuery --|> StrictModel
+    ActivityQuery ..> RunType
+    ActivityRequest --|> StrictModel
+    GlucoseRequest --|> ActivityRequest
+    ComparisonRequest --|> ActivityRequest
+    Evidence --|> StrictModel
+    ToolFunction --|> StrictModel
+    ToolCall --|> StrictModel
+    ToolCall *-- ToolFunction
+    CoachTools --> DataProcessor
+    CoachTools ..> Evidence
+    CoachTools ..> ActivityQuery
+    CoachTools ..> ActivityRequest
+    CoachTools ..> GlucoseRequest
+    CoachTools ..> ComparisonRequest
+    CoachToolDefinitions ..> ActivityQuery
+    CoachToolDefinitions ..> ActivityRequest
+    CoachToolDefinitions ..> GlucoseRequest
+    CoachToolDefinitions ..> ComparisonRequest
+    CoachAgent ..> CoachToolDefinitions
+    CoachAgent ..> CoachTools
+    CoachAgent ..> OpenRouterClient
+    CoachAgent ..> CoachAnswer
+    CoachAgent ..> ToolCall
+    CoachAgent ..> Evidence
+    CoachAgent ..> AppSettings
+    CoachRoutes ..> CoachAgent
+    CoachRoutes ..> ChatStore
+    CoachRoutes ..> CoachTools
+    CoachRoutes ..> AppSettings
+    OpenRouterClient ..> AppSettings
+    OpenRouterClient ..> OpenRouterError
+    OpenRouterError --|> RuntimeError
+    RunContext ..> DataProcessor
+
+    class RunComparisonRequest {
+        +list activity_ids
+    }
+    class TrainingOverviewRequest {
+        +int days
+        +str end_date
+    }
+    class MemoryQuery {
+        +str query
+        +int limit
+    }
+    class MemoryUpdate {
+        +str text
+        +str context_quote
+        +str key
+        +Literal category
+        +str quote
+        +int retention_days
+    }
+    class MemoryForget {
+        +str memory_id
+        +str quote
+    }
+    class CoachAnswer {
+        +validate_sources(messages) None
+        +str message
+        +list memory_updates
+        +list forget_memories
+    }
+    RunComparisonRequest --|> StrictModel
+    TrainingOverviewRequest --|> StrictModel
+    MemoryQuery --|> StrictModel
+    MemoryUpdate --|> StrictModel
+    MemoryForget --|> StrictModel
+    CoachAnswer --|> StrictModel
+    CoachAnswer *-- MemoryUpdate
+    CoachAnswer *-- MemoryForget
+    ChatStore ..> CoachAnswer
+    CoachTools --> ChatStore
+    CoachTools ..> AppSettings
+    CoachTools ..> RunComparisonRequest
+    CoachTools ..> TrainingOverviewRequest
+    CoachTools ..> MemoryQuery
+    CoachToolDefinitions ..> RunComparisonRequest
+    CoachToolDefinitions ..> TrainingOverviewRequest
+    CoachToolDefinitions ..> MemoryQuery
+    CoachRoutes ..> CoachAnswer
+
+    class CoachRendering {
+        <<module>>
+        +render_reply(text) Markup
+    }
+    CoachRoutes ..> CoachRendering

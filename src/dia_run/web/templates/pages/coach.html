@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="section">
+  <p class="eyebrow">Running coach</p>
+  <h1>Build on your runs. Plan what comes next.</h1>
+  <p>Review training, talk through fueling, and prepare for your next run. Diabetes treatment and insulin dosing stay outside the coach’s role.</p>
+  <p>Model: {{ model }}. Conversations are stored on this server and shared across your local browser sessions.
+    Selected health data, relevant saved notes, and this conversation history are sent to OpenRouter and its model provider when you submit.</p>
+  <a href="/coach">New conversation</a>
+  <ul>{% for chat in chats %}<li><a href="/coach?chat_id={{ chat.id }}">{{ chat.title }}</a></li>{% endfor %}</ul>
+  {% if error %}<div role="alert" style="border:2px solid #b42318;padding:1rem"><strong>The coach could not finish.</strong><p>{{ error }}</p><p>Your question is preserved below. You can retry it.</p></div>{% endif %}
+  {% for turn in turns %}
+    {% if turn.question %}<h2>Your question</h2><p style="white-space: pre-wrap">{{ turn.question }}</p>
+    {% elif turn.coach_html %}
+      <h2>Coach</h2><div class="coach-reply">{{ turn.coach_html }}</div>
+      {% if turn.memory_updates %}<details><summary>Notes saved with this reply</summary><ul>{% for note in turn.memory_updates %}<li>{{ note.text }} ({{ note.category }}, expires after {{ note.retention_days }} days)</li>{% endfor %}</ul></details>{% endif %}
+      {% if turn.forgotten %}<p>Removed {{ turn.forgotten }} saved note(s).</p>{% endif %}
+    {% endif %}
+  {% endfor %}
+  <form id="coach-form" action="/coach/message" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="chat_id" value="{{ chat_id or '' }}">
+    <label for="question">Question</label>
+    <textarea id="question" name="question" rows="4" maxlength="4000" required
+      style="display:block;width:100%" placeholder="What are you working towards, or what would you like to discuss?">{{ draft }}</textarea>
+    <p><label><input type="checkbox" name="consent" value="true" required>
+      I agree to send this conversation, relevant saved notes, and selected health data to OpenRouter and its model provider.</label></p>
+    <button id="respond-button" type="submit" class="button">Send</button>
+    <p id="coach-progress" role="status" aria-live="polite" hidden>Preparing your reply… This may take a few minutes while the agent checks the data.</p>
+  </form>
+  {% if chat_id %}<form action="/coach/delete" method="post" style="margin-top:1rem">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="chat_id" value="{{ chat_id }}">
+    <button type="submit" class="button button-outline">Delete this conversation</button>
+  </form>{% endif %}
+  <details style="margin-top:1rem"><summary>Coach memory · {{ memories | length }} active notes</summary>
+    <p>The coach automatically keeps selected goals, preferences, schedules, and follow-ups from your own words. Only a few relevant notes enter a new chat. You can also ask it to forget a note. Deleting a conversation removes its saved notes. Removing a note does not erase the original conversation or past replies.</p>
+    {% for note in memories %}<div><p>{{ note.text }}</p><details><summary>Source</summary><p>{{ note.quote }}</p>{% if note.context_quote %}<p>Context: {{ note.context_quote }}</p>{% endif %}</details><small>{{ note.category }} · expires {{ note.expires_at[:10] }} · <a href="/coach?chat_id={{ note.source_chat }}">Source conversation</a></small>
+      <form action="/coach/forget" method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="memory_id" value="{{ note.id }}"><button type="submit">Forget</button></form></div>
+    {% else %}<p>No saved notes yet.</p>{% endfor %}
+  </details>
+  {% if evidence %}<h2>Underlying evidence</h2>{% endif %}
+  {% for item in evidence %}<details id="{{ item.id }}">
+    <summary>{{ item.id }} · {{ item.tool }}</summary>
+    {% for aid in item.activity_ids %}<a href="/activities/{{ aid }}">Activity {{ aid }}</a> {% endfor %}
+    <pre style="white-space:pre-wrap;overflow-wrap:anywhere">{{ item.data | tojson(indent=2) }}</pre>
+  </details>{% endfor %}
+</section>
+<script>
+  const form = document.getElementById('coach-form');
+  form.addEventListener('submit', () => {
+    document.getElementById('respond-button').disabled = true;
+    document.getElementById('respond-button').textContent = 'Thinking…';
+    document.getElementById('coach-progress').hidden = false;
+    form.setAttribute('aria-busy', 'true');
+  });
+  window.addEventListener('pageshow', () => {
+    document.getElementById('respond-button').disabled = false;
+    document.getElementById('respond-button').textContent = 'Send';
+    document.getElementById('coach-progress').hidden = true;
+    form.removeAttribute('aria-busy');
+  });
+</script>
+{% endblock %}
