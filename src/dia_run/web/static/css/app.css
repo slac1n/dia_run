@@ -77,6 +77,20 @@ p {
   color: var(--text-muted);
 }
 
+.coach-reply {
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.coach-reply p,
+.coach-reply ul,
+.coach-reply ol,
+.coach-reply li,
+.coach-reply strong {
+  color: inherit;
+}
+
+
 a {
   color: inherit;
   text-decoration: none;

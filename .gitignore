@@ -24,10 +24,19 @@ data/
 
 # environment variables
 .env
-.env.prod
+.env.*
+!.env.example
+!.env.prod.example
 
 # login data
 logindata.json
 
 # runtime secrets
 secrets/
+
+# Local coach history
+.local-state/
+
+# Private runtime databases
+*.sqlite3
+*.sqlite3-*

@@ -23,6 +23,7 @@
           <a class="brand" href="/">Dia-Run</a>
         </div>
         <nav class="site-nav">
+          {% if coach_available() %}<a href="/coach">Running coach</a>{% endif %}
           {% if nav_items %}
           {% for item in nav_items %}
           <a href="{{ item.href }}">{{ item.label }}</a>

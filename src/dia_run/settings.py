@@ -25,8 +25,13 @@ class AppSettings(BaseSettings):
     aws_region: str | None = None
     heartbeat_email_from: str | None = None
     heartbeat_email_to: str | None = None
+    coach_enabled: bool = False
+    coach_history_path: Path = Path(".local-state/coach/chats.sqlite3")
+    coach_max_rounds: int = Field(default=8, ge=1, le=20)
+    coach_max_tool_calls: int = Field(default=16, ge=1, le=40)
+    coach_max_context_chars: int = Field(default=180000, ge=10000, le=500000)
     openrouter_api_key: str | None = None
-    openrouter_model: str = "mistralai/mistral-small-2603"
+    openrouter_model: str = "anthropic/claude-sonnet-5.5"
     openrouter_timeout_seconds: float = Field(default=120.0, gt=0)
     openrouter_reasoning_effort: Literal["", "low", "medium", "high"] = "high"
 
