@@ -1,3 +1,9 @@
+## v0.33.0 (2026-10-23)
+
+### Feat
+
+- add conversational running coach with contextual memory
+
 ## v0.32.1 (2026-10-17)
 
 ### Docs

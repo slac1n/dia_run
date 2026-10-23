@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from dia_run.data_processing.overview_data import invalidate_overview_data_service
 from dia_run.s3_sync import S3DataSync
 from dia_run.web.dependencies import get_data_paths
-from dia_run.web.routes import actions, activities, health, home, questionnaire
+from dia_run.web.routes import actions, activities, coach, health, home, questionnaire
 from dia_run.web.services.overview_page import invalidate_overview_page_service
 
 WEB_ROOT = Path(__file__).resolve().parent
@@ -34,6 +34,7 @@ def create_app() -> FastAPI:
     app.include_router(activities.router)
     app.include_router(questionnaire.router)
     app.include_router(health.router)
+    app.include_router(coach.router)
     return app
 
 

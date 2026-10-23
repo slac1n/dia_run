@@ -223,6 +223,25 @@ The production compose file uses:
 - runtime-mounted `./data` and `./secrets`
 - healthcheck against `/health`
 
+### Coach configuration and storage
+
+Set these values in `.env.prod`:
+
+```dotenv
+COACH_ENABLED=true
+OPENROUTER_MODEL=anthropic/claude-sonnet-5.5
+OPENROUTER_API_KEY=<openrouter-api-key>
+```
+
+Compose sets the database path to `/app/state/coach/chats.sqlite3` in its persistent
+`coach_state` volume, mounted only by `web`. The volume starts empty on the server;
+do not copy local databases. Chats and memory are separate from the S3-synced `data/`.
+There is no automatic SQLite backup. Rebuilds and container recreation preserve the volume;
+`docker compose down -v`, volume deletion or disk loss can erase it.
+
+Connect through WireGuard and open `/coach`. The coach uses the same VPN access protection
+as the rest of the application. Keep port 8000 closed publicly and bind to the WireGuard IP.
+
 ## 9. Manual Deployment Workflow
 
 First complete the feature PR into `develop`, the versioned release PR into `main`, and the
