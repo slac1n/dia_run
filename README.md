@@ -4,7 +4,7 @@ Dia-Run brings Strava running activities and Medtronic CareLink glucose and insu
 
 ![Activity detail with run metrics, glucose and insulin timeline, and fueling entries](docs/images/activity-detail.jpg)
 
-*Activity detail shown with synthetic test data.*
+*Activity detail shown with illustrative synthetic data.*
 
 ## What it does
 
@@ -12,6 +12,7 @@ Dia-Run brings Strava running activities and Medtronic CareLink glucose and insu
 - Compares runs by type, distance, glucose outcomes, and preparation.
 - Records pre-run nutrition, basal settings, fueling, and boluses through a questionnaire.
 - Provides optional AI run recommendations through OpenRouter.
+- Includes a conversational AI running coach to review activities, compare runs, and plan training with remembered goals and preferences.
 - Includes a mock-data mode for exploring the app without connected accounts.
 
 Built with **Python 3.12**, **FastAPI**, **Jinja2**, and **Plotly**, with **Polars** for processing, **Delta Lake** for storage, and **Pandera/Pydantic** for validation.
@@ -59,6 +60,8 @@ The importer checks the latest Strava activity and imports it only if it is a ru
 ## Optional features
 
 **AI recommendations:** Set `OPENROUTER_API_KEY` in `.env` to enable recommendations on activity pages. Requests send run and health context to OpenRouter and the selected model provider. `OPENROUTER_MODEL` selects the model.
+
+For the **AI running coach**, also set `COACH_ENABLED=true` and open **Running coach**. It can discuss your running, fueling, and glucose history and remember relevant context across conversations. See the [coach guide](docs/coach.md) for consent, memory controls, and storage details.
 
 **Docker:** After completing account setup locally, start the web app with:
 
