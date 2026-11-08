@@ -1,3 +1,9 @@
+## v0.33.1 (2026-11-08)
+
+### Docs
+
+- Replace the README activity screenshot with a more realistic synthetic run and document the conversational AI running coach.
+
 ## v0.33.0 (2026-10-23)
 
 ### Feat
